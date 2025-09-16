@@ -1,0 +1,203 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* FarmersBracket Agriculture eCommerce Design System
+Green-themed design with semantic tokens for agriculture marketplace
+*/
+
+@layer base {
+  :root {
+    /* Agriculture Green Theme */
+    --background: 120 20% 98%;
+    --foreground: 120 10% 15%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 120 10% 15%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 120 10% 15%;
+
+    /* Primary: Fresh Agriculture Green */
+    --primary: 120 45% 35%;
+    --primary-foreground: 0 0% 100%;
+    --primary-light: 120 40% 45%;
+    --primary-dark: 120 50% 25%;
+
+    /* Secondary: Earth Tones */
+    --secondary: 120 15% 93%;
+    --secondary-foreground: 120 10% 20%;
+
+    --muted: 120 10% 95%;
+    --muted-foreground: 120 8% 45%;
+
+    --accent: 60 50% 85%;
+    --accent-foreground: 120 10% 20%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 120 15% 88%;
+    --input: 120 15% 95%;
+    --ring: 120 45% 35%;
+
+    /* Success and Status Colors */
+    --success: 120 60% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 90% 55%;
+    --warning-foreground: 0 0% 15%;
+    --info: 200 80% 50%;
+    --info-foreground: 0 0% 100%;
+
+    /* Agriculture Specific Colors */
+    --farm-green: 120 50% 30%;
+    --harvest-gold: 45 80% 60%;
+    --earth-brown: 30 25% 45%;
+    --sky-blue: 200 70% 60%;
+
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
+    --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(120 50% 50%));
+    --gradient-harvest: linear-gradient(135deg, hsl(var(--harvest-gold)), hsl(45 70% 70%));
+    --gradient-nature: linear-gradient(135deg, hsl(var(--farm-green)), hsl(var(--primary)));
+
+    /* Shadows */
+    --shadow-soft: 0 2px 8px hsl(var(--primary) / 0.1);
+    --shadow-medium: 0 4px 12px hsl(var(--primary) / 0.15);
+    --shadow-strong: 0 8px 24px hsl(var(--primary) / 0.2);
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark Agriculture Theme */
+    --background: 120 15% 8%;
+    --foreground: 120 10% 95%;
+
+    --card: 120 15% 10%;
+    --card-foreground: 120 10% 95%;
+
+    --popover: 120 15% 10%;
+    --popover-foreground: 120 10% 95%;
+
+    /* Primary: Bright Agriculture Green for dark mode */
+    --primary: 120 50% 55%;
+    --primary-foreground: 120 15% 8%;
+    --primary-light: 120 45% 65%;
+    --primary-dark: 120 55% 45%;
+
+    --secondary: 120 10% 15%;
+    --secondary-foreground: 120 10% 85%;
+
+    --muted: 120 8% 12%;
+    --muted-foreground: 120 8% 65%;
+
+    --accent: 60 40% 25%;
+    --accent-foreground: 120 10% 95%;
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 120 10% 18%;
+    --input: 120 10% 15%;
+    --ring: 120 50% 55%;
+
+    /* Dark mode agriculture colors */
+    --success: 120 60% 50%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 85% 60%;
+    --warning-foreground: 0 0% 15%;
+    --info: 200 75% 55%;
+    --info-foreground: 0 0% 100%;
+
+    --farm-green: 120 55% 40%;
+    --harvest-gold: 45 75% 65%;
+    --earth-brown: 30 30% 35%;
+    --sky-blue: 200 65% 55%;
+
+    /* Dark mode gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-light)));
+    --gradient-success: linear-gradient(135deg, hsl(var(--success)), hsl(120 55% 60%));
+    --gradient-harvest: linear-gradient(135deg, hsl(var(--harvest-gold)), hsl(45 70% 75%));
+    --gradient-nature: linear-gradient(135deg, hsl(var(--farm-green)), hsl(var(--primary)));
+
+    /* Dark mode shadows */
+    --shadow-soft: 0 2px 8px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 12px hsl(0 0% 0% / 0.4);
+    --shadow-strong: 0 8px 24px hsl(0 0% 0% / 0.5);
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* Prevent bounce scrolling on mobile */
+    overscroll-behavior-y: contain;
+    /* Improve touch scrolling performance */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Mobile optimizations */
+  button, a, [role="button"] {
+    /* Increase tap target size for mobile accessibility */
+    min-height: 44px;
+    min-width: 44px;
+    /* Remove default button styles on mobile */
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+  }
+
+  /* Prevent text selection on touch elements */
+  .touch-none {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+  }
+
+  /* Safe area handling for mobile devices */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .safe-area-left {
+    padding-left: env(safe-area-inset-left);
+  }
+
+  .safe-area-right {
+    padding-right: env(safe-area-inset-right);
+  }
+}
