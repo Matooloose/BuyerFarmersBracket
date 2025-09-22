@@ -15,9 +15,15 @@ interface Farm {
   farmer_id: string;
 }
 
+interface FarmerProfile {
+  id: string;
+  image_url?: string;
+}
+
 const AvailableFarms = () => {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
+  const [farmerProfiles, setFarmerProfiles] = useState<Record<string, FarmerProfile>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollIdx, setScrollIdx] = useState(0);
   const navigate = useNavigate();
@@ -32,6 +38,26 @@ const AvailableFarms = () => {
           console.error('Error fetching farms:', error);
         } else {
           setFarms(data || []);
+          // Fetch farmer profiles for each farm
+          const farmerIds = (data || []).map((farm: Farm) => farm.farmer_id).filter(Boolean);
+          if (farmerIds.length > 0) {
+            const { data: profiles, error: profileError } = await supabase
+              .from('profiles')
+              .select('id,image_url')
+              .in('id', farmerIds);
+            if (profiles) {
+              const profileMap: Record<string, FarmerProfile> = {};
+              profiles.forEach((profile) => {
+                if (profile != null && typeof profile === 'object' && 'id' in profile) {
+                  profileMap[(profile as FarmerProfile).id] = profile as FarmerProfile;
+                }
+              });
+              setFarmerProfiles(profileMap);
+            }
+            if (profileError) {
+              console.error('Error fetching farmer profiles:', profileError);
+            }
+          }
         }
       } catch (error) {
         console.error('Error:', error);
@@ -101,9 +127,9 @@ const AvailableFarms = () => {
               onClick={() => handleFarmClick(farm)}
             >
               <div className="w-full h-28 bg-primary/10 rounded-t-lg flex items-center justify-center overflow-hidden">
-                {farm.image_url ? (
+                {farmerProfiles[farm.farmer_id]?.image_url ? (
                   <img
-                    src={farm.image_url}
+                    src={farmerProfiles[farm.farmer_id].image_url}
                     alt={farm.name}
                     className="w-full h-full object-cover rounded-t-lg"
                   />
@@ -113,13 +139,13 @@ const AvailableFarms = () => {
               </div>
               <div className="p-4">
                 <h4 className="font-semibold text-lg text-foreground truncate mb-1">{farm.name}</h4>
-                <p className="text-xs text-muted-foreground mb-2">{farm.description || "No bio available."}</p>
                 {farm.address && (
                   <p className="text-xs text-muted-foreground mb-1"><span className="font-medium">Address:</span> {farm.address}</p>
                 )}
                 {farm.location && (
                   <p className="text-xs text-muted-foreground mb-1"><span className="font-medium">Location:</span> {farm.location}</p>
                 )}
+                  <p className="text-sm text-muted-foreground line-clamp-2">{farm.description || "No bio available."}</p>
               </div>
             </div>
           ))}
