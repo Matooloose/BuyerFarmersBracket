@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Leaf } from "lucide-react";
@@ -10,6 +10,7 @@ interface Farm {
   name: string;
   description: string;
   location: string;
+  address?: string;
   image_url: string;
   farmer_id: string;
 }
@@ -17,11 +18,9 @@ interface Farm {
 const AvailableFarms = () => {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedFarm, setSelectedFarm] = useState<Farm | null>(null);
-  const [farmerAddress, setFarmerAddress] = useState<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollIdx, setScrollIdx] = useState(0);
-  const [showMap, setShowMap] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchFarms = async () => {
@@ -61,22 +60,8 @@ const AvailableFarms = () => {
     }
   }, [scrollIdx, farms.length]);
 
-  const handleFarmClick = async (farm: Farm) => {
-    setSelectedFarm(farm);
-    if (farm.farmer_id) {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('address')
-        .eq('id', farm.farmer_id)
-        .single();
-      if (data && data.address) {
-        setFarmerAddress(data.address);
-      } else {
-        setFarmerAddress("");
-      }
-    } else {
-      setFarmerAddress("");
-    }
+  const handleFarmClick = (farm: Farm) => {
+    navigate(`/farmer/${farm.farmer_id}`);
   };
 
   if (loading) {
@@ -112,75 +97,34 @@ const AvailableFarms = () => {
           {farms.map((farm) => (
             <div
               key={farm.id}
-              className="inline-block min-w-[220px] max-w-xs bg-card border rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer align-top farm-scroll-card"
+              className="inline-block min-w-[240px] max-w-xs bg-card border rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer align-top farm-scroll-card"
               onClick={() => handleFarmClick(farm)}
             >
-              <div className="w-full h-24 bg-primary/10 rounded-t-lg flex items-center justify-center overflow-hidden">
+              <div className="w-full h-28 bg-primary/10 rounded-t-lg flex items-center justify-center overflow-hidden">
                 {farm.image_url ? (
                   <img
                     src={farm.image_url}
                     alt={farm.name}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-cover rounded-t-lg"
                   />
                 ) : (
-                  <Leaf className="h-8 w-8 text-primary" />
+                  <Leaf className="h-10 w-10 text-primary" />
                 )}
               </div>
-              <div className="p-3">
-                <h4 className="font-medium text-foreground truncate mb-1">{farm.name}</h4>
-                <p className="text-xs text-muted-foreground line-clamp-2 mb-2">
-                  {farm.description || "Fresh organic produce available"}
-                </p>
+              <div className="p-4">
+                <h4 className="font-semibold text-lg text-foreground truncate mb-1">{farm.name}</h4>
+                <p className="text-xs text-muted-foreground mb-2">{farm.description || "No bio available."}</p>
+                {farm.address && (
+                  <p className="text-xs text-muted-foreground mb-1"><span className="font-medium">Address:</span> {farm.address}</p>
+                )}
+                {farm.location && (
+                  <p className="text-xs text-muted-foreground mb-1"><span className="font-medium">Location:</span> {farm.location}</p>
+                )}
               </div>
             </div>
           ))}
         </div>
       </CardContent>
-      {/* Farmer Details Dialog */}
-      {selectedFarm && (
-        <Dialog open={!!selectedFarm} onOpenChange={() => {
-          setSelectedFarm(null);
-          setShowMap(false);
-        }}>
-          <DialogContent className="max-w-2xl">
-            <DialogHeader>
-              <DialogTitle>{selectedFarm.name} Details</DialogTitle>
-            </DialogHeader>
-            <div className="flex flex-col md:flex-row gap-6 items-start">
-              <div className="flex-shrink-0">
-                {selectedFarm.image_url ? (
-                  <img src={selectedFarm.image_url} alt={selectedFarm.name} className="w-32 h-32 object-cover rounded-lg" />
-                ) : (
-                  <Leaf className="h-16 w-16 text-primary" />
-                )}
-              </div>
-              <div>
-                <h3 className="font-semibold text-lg mb-2">{selectedFarm.name}</h3>
-                <p className="text-sm text-muted-foreground mb-2">{selectedFarm.description || "No description available."}</p>
-                <p className="text-sm mb-2"><span className="font-medium">Address:</span> {farmerAddress || selectedFarm.location}</p>
-                <button
-                  className="mt-2 px-4 py-2 bg-primary text-white rounded hover:bg-primary/80"
-                  onClick={() => setShowMap(true)}
-                >
-                  See on Map
-                </button>
-              </div>
-            </div>
-            {showMap && (
-              <div className="farm-map-container mt-6">
-                <iframe
-                  className="farm-map-iframe"
-                  loading="lazy"
-                  allowFullScreen
-                  src={`https://www.google.com/maps?q=${encodeURIComponent(farmerAddress || selectedFarm.location)}&output=embed`}
-                  title={selectedFarm.name}
-                />
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
-
     </Card>
   );
 };
