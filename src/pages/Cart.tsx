@@ -1,10 +1,4 @@
-import { useNavigate } from "react-router-dom";
-import { useCart } from "@/contexts/CartContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { 
+import {
   ArrowLeft,
   Plus,
   Minus,
@@ -13,18 +7,79 @@ import {
   Home,
   Package,
   MessageCircle,
-  Search
+  Search,
+  Bookmark
 } from "lucide-react";
+import { Button } from "../components/ui/button"; // Adjust the path as needed
+import { Input } from "../components/ui/input"; // Adjust the path as needed
+import { Card, CardContent } from "../components/ui/card"; // Adjust the path as needed
+import { Separator } from "../components/ui/separator"; // Adjust the path as needed
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useCart } from "../contexts/CartContext";
 
 const Cart = () => {
   const navigate = useNavigate();
   const { cartItems, updateQuantity, removeItem, getTotalPrice, getTotalItems } = useCart();
 
+  // Save for Later state
+  const [savedItems, setSavedItems] = useState(() => {
+    const stored = localStorage.getItem('savedItems');
+    return stored ? JSON.parse(stored) : [];
+  });
+  const saveForLater = (item) => {
+    setSavedItems(prev => {
+      const updated = [...prev, item];
+      localStorage.setItem('savedItems', JSON.stringify(updated));
+      return updated;
+    });
+    removeItem(item.id);
+  };
+  const moveToCart = (item) => {
+    // You may want to add a function in CartContext to add item back to cart
+    // For now, reload page and let user add from BrowseProducts
+    setSavedItems(prev => {
+      const updated = prev.filter(i => i.id !== item.id);
+      localStorage.setItem('savedItems', JSON.stringify(updated));
+      return updated;
+    });
+    // Optionally: addToCart(item)
+  };
+
+  // Notes per item
+  const [notes, setNotes] = useState(() => {
+    const stored = localStorage.getItem('cartNotes');
+    return stored ? JSON.parse(stored) : {};
+  });
+  const handleNoteChange = (id, value) => {
+    setNotes(prev => {
+      const updated = { ...prev, [id]: value };
+      localStorage.setItem('cartNotes', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Promo code
+  const [promoCode, setPromoCode] = useState(() => "");
+  const [promoApplied, setPromoApplied] = useState(() => false);
+  const [discount, setDiscount] = useState(() => 0);
+  const validCodes = { "FRESH10": 0.1, "FARM5": 0.05 };
+  const handleApplyPromo = () => {
+    const code = promoCode.trim().toUpperCase();
+    if (validCodes[code]) {
+      setDiscount(validCodes[code]);
+      setPromoApplied(true);
+    } else {
+      setDiscount(0);
+      setPromoApplied(false);
+      alert("Invalid promo code");
+    }
+  };
+
   const bottomNavItems = [
     { icon: Home, label: "Home", path: "/home" },
     { icon: ShoppingCart, label: "Cart", path: "/cart", active: true },
     { icon: Package, label: "Track", path: "/track-order" },
-    
     { icon: Search, label: "Browse", path: "/browse-products" },
   ];
 
@@ -75,47 +130,52 @@ const Cart = () => {
                         <Package className="h-6 w-6 text-primary/40" />
                       )}
                     </div>
-                    
                     <div className="flex-1 space-y-1">
                       <h3 className="font-semibold text-foreground">{item.name}</h3>
                       <p className="text-sm text-muted-foreground">{item.farmName || 'Local Farm'}</p>
                       <p className="font-semibold text-primary">
                         R{item.price.toFixed(2)}/{item.unit}
                       </p>
+                      {/* Notes field */}
+                      <Input
+                        type="text"
+                        placeholder="Add a note for the farmer..."
+                        value={typeof notes[item.id] === 'string' ? notes[item.id] : ''}
+                        onChange={e => handleNoteChange(item.id, e.target.value)}
+                        className="mt-2"
+                      />
                     </div>
-
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      
-                      <span className="w-8 text-center font-medium">{item.quantity}</span>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-8 p-0"
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                      
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                        onClick={() => removeItem(item.id)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div className="flex flex-col items-center space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="w-8 text-center font-medium">{item.quantity}</span>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-8 p-0"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                          onClick={() => removeItem(item.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      {/* You can add another action here, e.g. Share, or leave empty for now */}
                     </div>
                   </div>
-                  
                   <div className="mt-3 pt-3 border-t">
                     <div className="flex justify-between text-sm">
                       <span className="text-muted-foreground">Subtotal:</span>
@@ -127,6 +187,26 @@ const Cart = () => {
                 </CardContent>
               </Card>
             ))}
+            {/* Saved for Later Items */}
+            {savedItems.length > 0 && (
+              <div className="mt-8">
+                <h3 className="font-semibold mb-2">Saved for Later</h3>
+                {savedItems.map((item) => (
+                  <Card key={item.id} className="border-dashed">
+                    <CardContent className="p-4 flex items-center justify-between">
+                      <div>
+                        <h4 className="font-semibold">{item.name}</h4>
+                        <p className="text-sm text-muted-foreground">{item.farmName || 'Local Farm'}</p>
+                        <p className="font-semibold text-primary">R{item.price.toFixed(2)}/{item.unit}</p>
+                      </div>
+                      <Button size="sm" onClick={() => moveToCart(item)}>
+                        Move to Cart
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -135,6 +215,26 @@ const Cart = () => {
       {cartItems.length > 0 && (
         <div className="fixed bottom-16 left-0 right-0 bg-card border-t shadow-strong p-4">
           <div className="space-y-4">
+            {/* Promo Code */}
+            <div className="flex items-center gap-2 mb-2">
+              <Input
+                type="text"
+                placeholder="Promo code"
+                value={promoCode}
+                onChange={e => setPromoCode(e.target.value)}
+                className="w-32"
+                disabled={promoApplied}
+              />
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleApplyPromo}
+                disabled={promoApplied}
+              >
+                {promoApplied ? "Applied" : "Apply"}
+              </Button>
+              {promoApplied && <span className="text-green-600 text-xs">Discount applied!</span>}
+            </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Subtotal:</span>
@@ -144,13 +244,18 @@ const Cart = () => {
                 <span className="text-muted-foreground">Delivery Fee:</span>
                 <span>R2.99</span>
               </div>
+              {promoApplied && (
+                <div className="flex justify-between text-sm text-green-600">
+                  <span>Promo Discount:</span>
+                  <span>-R{(getTotalPrice() * discount).toFixed(2)}</span>
+                </div>
+              )}
               <Separator />
               <div className="flex justify-between font-semibold">
                 <span>Total:</span>
-                <span>R{(getTotalPrice() + 2.99).toFixed(2)}</span>
+                <span>R{(getTotalPrice() + 2.99 - (promoApplied ? getTotalPrice() * discount : 0)).toFixed(2)}</span>
               </div>
             </div>
-            
             <Button 
               className="w-full bg-gradient-to-r from-primary to-primary-light"
               onClick={() => navigate('/checkout')}
@@ -169,9 +274,7 @@ const Cart = () => {
               key={item.path}
               variant="ghost"
               size="sm"
-              className={`flex flex-col items-center px-3 py-2 h-auto ${
-                item.active ? 'text-primary' : ''
-              }`}
+              className={`flex flex-col items-center px-3 py-2 h-auto ${item.active ? 'text-primary' : ''}`}
               onClick={() => navigate(item.path)}
             >
               <item.icon className="h-5 w-5 mb-1" />
@@ -185,3 +288,4 @@ const Cart = () => {
 };
 
 export default Cart;
+

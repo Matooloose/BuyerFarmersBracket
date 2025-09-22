@@ -1,24 +1,68 @@
-import { useState, useEffect } from "react";
+  // Helper to fetch farms for a given farmerId (example usage)
+  const fetchFarms = async (farmerId: string) => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/farms?select=name&farmer_id=eq.${farmerId}`,
+        {
+          headers: {
+            apikey: import.meta.env.VITE_SUPABASE_KEY,
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_KEY}`,
+            Accept: 'application/json',
+          },
+        }
+      );
+      if (!response.ok) throw new Error('Network response was not ok');
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Error fetching farms:', error);
+      return null;
+    }
+  };
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { 
+import {
   ArrowLeft,
   Search,
-  Filter,
   Plus,
+  Check,
+  Heart,
+  Star,
   Home,
   ShoppingCart,
   Package,
-  MessageCircle,
   Grid3X3,
   List
 } from "lucide-react";
+import FilterDialog from "@/components/FilterDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/CartContext";
+import { Badge } from "@/components/ui/badge";
+
+type Review = {
+  productId: string;
+  rating: number;
+  comment: string;
+};
+
+const getReviews = (): Review[] => {
+  const stored = localStorage.getItem("reviews");
+  return stored ? JSON.parse(stored) : [];
+};
+
+const saveReview = (review: Review) => {
+  const reviews = getReviews();
+  const filtered = reviews.filter(r => r.productId !== review.productId);
+  localStorage.setItem("reviews", JSON.stringify([...filtered, review]));
+};
+
+const getProductReviews = (productId: string): Review[] => {
+  return getReviews().filter(r => r.productId === productId);
+};
 
 interface Product {
   id: string;
@@ -31,55 +75,69 @@ interface Product {
   is_organic: boolean;
   is_featured: boolean;
   farmer_id: string;
+  farmerName?: string;
   quantity: number;
 }
 
-const BrowseProducts = () => {
+function BrowseProducts() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { addToCart } = useCart();
-  const [products, setProducts] = useState<Product[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("all");
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [loading, setLoading] = useState(true);
-
-  const categories = [
-    "all",
-    "vegetables", 
-    "fruits",
-    "grains",
-    "herbs",
-    "dairy",
-    "meat"
-  ];
-
+  
+  // Fetch products from Supabase on mount
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    setLoading(true);
+    supabase
+          .from('products')
+          .select('*')
+          .then(({ data, error }) => {
+            if (error) {
+              toast({ title: 'Error', description: 'Failed to load products', variant: 'destructive' });
+            } else {
+              setProducts(data || []);
+            }
+            setLoading(false);
+          });
+  }, [toast]);
+  const { addToCart, cartItems, getTotalItems } = useCart();
+  const [products, setProducts] = useState<Product[]>([]);
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [showWishlist, setShowWishlist] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [categories, setCategories] = useState<string[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [filters, setFilters] = useState<Record<string, unknown>>({});
+  const [loading, setLoading] = useState(false);
+  const [addedProductId, setAddedProductId] = useState<string | null>(null);
+  // Review modal state
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewProductId, setReviewProductId] = useState<string | null>(null);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
 
-  const fetchProducts = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .gt('quantity', 0)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setProducts(data || []);
-    } catch (error) {
-      toast({
-        title: "Error loading products",
-        description: "Failed to load products",
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
+  // Review/rating system helpers
+  const getReviews = (): Review[] => {
+    const stored = localStorage.getItem("reviews");
+    return stored ? JSON.parse(stored) : [];
+  };
+  const saveReview = (review: Review) => {
+    const reviews = getReviews();
+    const filtered = reviews.filter(r => r.productId !== review.productId);
+    localStorage.setItem("reviews", JSON.stringify([...filtered, review]));
+  };
+  const getProductReviews = (productId: string): Review[] => {
+    return getReviews().filter(r => r.productId === productId);
   };
 
-  const addProductToCart = async (productId: string) => {
+  // Wishlist toggle
+  const toggleWishlist = (productId: string) => {
+    setWishlist(w =>
+      w.includes(productId) ? w.filter(id => id !== productId) : [...w, productId]
+    );
+  };
+
+  // Add to cart logic
+  const addProductToCart = (productId: string) => {
     const product = products.find(p => p.id === productId);
     if (product) {
       addToCart({
@@ -87,28 +145,45 @@ const BrowseProducts = () => {
         name: product.name,
         price: product.price,
         unit: product.unit,
-        image: product.images[0],
-        farmName: 'Local Farm',
+        image: product.images && product.images.length > 0 ? product.images[0] : "",
+        farmName: product.farmerName || "",
         category: product.category
       });
-      
-      toast({
-        title: "Added to Cart",
-        description: `${product.name} has been added to your cart`,
-      });
+      setAddedProductId(productId);
+      setTimeout(() => setAddedProductId(null), 1500);
     }
   };
 
+  // Filter products based on search, category, filters
   const filteredProducts = products.filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.category.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = selectedCategory === "all" || 
-      product.category.toLowerCase() === selectedCategory.toLowerCase();
-    
+    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = !selectedCategory || product.category === selectedCategory;
+    // Add more filter logic as needed
     return matchesSearch && matchesCategory;
   });
+
+  // Products to show (wishlist or filtered)
+  // Removed duplicate declaration of productsToShow
+
+  // Fetch categories from products
+  useEffect(() => {
+    setCategories([...new Set(products.map(p => p.category))]);
+  }, [products]);
+
+  // Review modal logic
+  const openReviewModal = (productId: string) => {
+    setReviewProductId(productId);
+    setReviewRating(0);
+    setReviewComment("");
+    setReviewModalOpen(true);
+  };
+  const handleReviewSubmit = () => {
+    if (reviewProductId) {
+      saveReview({ productId: reviewProductId, rating: reviewRating, comment: reviewComment });
+      setReviewModalOpen(false);
+    }
+  };
+    
 
   const bottomNavItems = [
     { icon: Home, label: "Home", path: "/home" },
@@ -118,11 +193,21 @@ const BrowseProducts = () => {
     { icon: Search, label: "Browse", path: "/browse-products", active: true },
   ];
 
+  const productsToShow = showWishlist
+    ? products.filter(p => wishlist.includes(p.id))
+    : filteredProducts;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card border-b shadow-soft">
         <div className="p-4 space-y-4">
+          <div className="flex justify-end mb-2">
+            <Button variant={showWishlist ? "default" : "outline"} size="sm" onClick={() => setShowWishlist(w => !w)}>
+              <Heart className={`h-5 w-5 ${showWishlist ? 'text-primary' : ''}`} />
+              <span className="ml-2">{showWishlist ? "Wishlist" : "Show Wishlist"}</span>
+            </Button>
+          </div>
           <div className="flex items-center justify-between">
             <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
               <ArrowLeft className="h-5 w-5" />
@@ -136,9 +221,7 @@ const BrowseProducts = () => {
               >
                 {viewMode === 'grid' ? <List className="h-5 w-5" /> : <Grid3X3 className="h-5 w-5" />}
               </Button>
-              <Button variant="ghost" size="sm">
-                <Filter className="h-5 w-5" />
-              </Button>
+              <FilterDialog onFiltersChange={setFilters} />
             </div>
           </div>
 
@@ -188,8 +271,17 @@ const BrowseProducts = () => {
               ? 'grid grid-cols-2 gap-4' 
               : 'space-y-4'
           }`}>
-            {filteredProducts.map((product) => (
-              <Card key={product.id} className="overflow-hidden">
+            {productsToShow.map((product) => (
+              <Card key={product.id} className="overflow-hidden relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 z-10"
+                  onClick={() => toggleWishlist(product.id)}
+                  aria-label={wishlist.includes(product.id) ? "Remove from wishlist" : "Add to wishlist"}
+                >
+                  <Heart className={`h-5 w-5 ${wishlist.includes(product.id) ? 'text-primary' : 'text-muted-foreground'}`} />
+                </Button>
                 {viewMode === 'grid' ? (
                   <>
                     <div className="aspect-square bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center">
@@ -233,8 +325,13 @@ const BrowseProducts = () => {
                             size="sm" 
                             className="h-8 w-8 p-0"
                             onClick={() => addProductToCart(product.id)}
+                            disabled={addedProductId === product.id}
                           >
-                            <Plus className="h-4 w-4" />
+                            {addedProductId === product.id ? (
+                              <Check className="h-4 w-4 text-success" />
+                            ) : (
+                              <Plus className="h-4 w-4" />
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -279,9 +376,19 @@ const BrowseProducts = () => {
                           <Button 
                             size="sm"
                             onClick={() => addProductToCart(product.id)}
+                            disabled={addedProductId === product.id}
                           >
-                            <Plus className="h-4 w-4 mr-1" />
-                            Add to Cart
+                            {addedProductId === product.id ? (
+                              <>
+                                <Check className="h-4 w-4 mr-1 text-success" />
+                                Added
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4 mr-1" />
+                                Add to Cart
+                              </>
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -307,7 +414,14 @@ const BrowseProducts = () => {
               }`}
               onClick={() => navigate(item.path)}
             >
-              <item.icon className="h-5 w-5 mb-1" />
+              <div className="relative">
+                <item.icon className="h-5 w-5 mb-1" />
+                {item.label === "Cart" && getTotalItems() > 0 && (
+                  <Badge className="absolute -top-2 -right-2 text-xs px-1 py-0.5 rounded-full bg-primary text-white">
+                    {getTotalItems()}
+                  </Badge>
+                )}
+              </div>
               <span className="text-xs">{item.label}</span>
             </Button>
           ))}
@@ -315,6 +429,6 @@ const BrowseProducts = () => {
       </nav>
     </div>
   );
-};
+}
 
 export default BrowseProducts;

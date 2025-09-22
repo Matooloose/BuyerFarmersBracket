@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+
 import {
   Dialog,
   DialogTrigger,
@@ -15,6 +17,7 @@ import {
   DialogFooter,
   DialogClose
 } from "@/components/ui/dialog";
+import LiveTrackingDialog from "@/components/LiveTrackingDialog";
 import { 
   ArrowLeft,
   Package,
@@ -55,6 +58,7 @@ import {
 const TrackOrder = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { cartItems, getTotalItems } = useCart();
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -385,10 +389,15 @@ const TrackOrder = () => {
                       </DialogContent>
                     </Dialog>
                     {order.status !== 'delivered' && (
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <MapPin className="h-4 w-4 mr-1" />
-                        Track Live
-                      </Button>
+                      <LiveTrackingDialog 
+                        orderId={order.id}
+                        trigger={
+                          <Button variant="outline" size="sm" className="flex-1">
+                            <MapPin className="h-4 w-4 mr-1" />
+                            Track Live
+                          </Button>
+                        }
+                      />
                     )}
                   </div>
                 </CardContent>
@@ -411,7 +420,14 @@ const TrackOrder = () => {
               }`}
               onClick={() => navigate(item.path)}
             >
-              <item.icon className="h-5 w-5 mb-1" />
+              <div className="relative">
+                <item.icon className="h-5 w-5 mb-1" />
+                {item.label === "Cart" && getTotalItems() > 0 && (
+                  <Badge className="absolute -top-2 -right-2 text-xs px-1 py-0.5 rounded-full bg-primary text-white">
+                    {getTotalItems()}
+                  </Badge>
+                )}
+              </div>
               <span className="text-xs">{item.label}</span>
             </Button>
           ))}

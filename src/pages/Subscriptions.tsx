@@ -142,6 +142,7 @@ const formatPrice = (price: number) => {
             <Button variant="ghost" onClick={() => navigate('/dashboard')}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back
+      const [showModifyModal, setShowModifyModal] = useState(false);
             </Button>
           </div>
           <div className="text-center">Loading subscription plans...</div>

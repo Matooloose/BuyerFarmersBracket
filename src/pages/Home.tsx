@@ -18,6 +18,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/CartContext";
+
 import { NotificationIcon } from "@/components/NotificationIcon";
 
 interface Product {
@@ -46,7 +47,7 @@ interface Farm {
 const Home = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { addToCart, getTotalItems } = useCart();
+  const { addToCart, cartItems, getTotalItems } = useCart();
   const [products, setProducts] = useState<Product[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -91,13 +92,29 @@ const Home = () => {
   const addProductToCart = async (productId: string) => {
     const product = products.find(p => p.id === productId);
     if (product) {
+      // Get farm name from database
+      let farmName = 'Local Farm';
+      try {
+        const { data: farm } = await supabase
+          .from('farms')
+          .select('name')
+          .eq('farmer_id', product.farmer_id)
+          .single();
+        
+        if (farm) {
+          farmName = farm.name;
+        }
+      } catch (error) {
+        console.error('Error fetching farm name:', error);
+      }
+
       addToCart({
         id: product.id,
         name: product.name,
         price: product.price,
         unit: product.unit,
         image: product.images[0],
-        farmName: 'Local Farm',
+        farmName,
         category: product.category
       });
       
@@ -115,7 +132,7 @@ const Home = () => {
 
   const bottomNavItems = [
     { icon: HomeIcon, label: "Home", path: "/home", active: true },
-    { icon: ShoppingCart, label: "Cart", path: "/cart", showBadge: true },
+    { icon: ShoppingCart, label: "Cart", path: "/cart" },
     { icon: Package, label: "Track", path: "/track-order" },
     { icon: Search, label: "Browse", path: "/browse-products" },
   ];
@@ -274,10 +291,10 @@ const Home = () => {
             >
               <div className="relative">
                 <item.icon className="h-5 w-5 mb-1" />
-                {item.showBadge && getTotalItems() > 0 && (
-                  <span className="absolute -top-1 -right-2 bg-primary text-white rounded-full text-xs px-1 min-w-[18px] h-4 flex items-center justify-center">
-                    {getTotalItems() > 99 ? '99+' : getTotalItems()}
-                  </span>
+                {item.label === "Cart" && getTotalItems() > 0 && (
+                  <Badge className="absolute -top-2 -right-2 text-xs px-1 py-0.5 rounded-full bg-primary text-white">
+                    {getTotalItems()}
+                  </Badge>
                 )}
               </div>
               <span className="text-xs">{item.label}</span>

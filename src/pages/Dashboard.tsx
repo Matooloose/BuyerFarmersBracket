@@ -1,4 +1,5 @@
-import { useState } from "react";
+import React, { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -26,11 +27,50 @@ import { NotificationIcon } from "@/components/NotificationIcon";
 import AvailableFarms from "@/components/AvailableFarms";
 
 const Dashboard = () => {
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { signOut, user } = useAuth();
-  const [darkMode, setDarkMode] = useState(false);
-  const [notifications, setNotifications] = useState(true);
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark';
+    }
+    return false;
+  });
+  const [notifications, setNotifications] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('notifications') !== 'false';
+    }
+    return true;
+  });
+  // Sync notifications toggle with localStorage
+  const handleNotificationsChange = (value: boolean) => {
+    setNotifications(value);
+    localStorage.setItem('notifications', value ? 'true' : 'false');
+    // Optionally, trigger global notification enable/disable logic here
+  };
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+
+  // Sync dark mode with document and localStorage
+  const handleDarkModeChange = (value: boolean) => {
+    setDarkMode(value);
+    if (value) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  // Ensure theme is applied on mount
+  React.useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [darkMode]);
 
   const handleNavigation = (path: string) => {
     navigate(path);
@@ -38,8 +78,9 @@ const Dashboard = () => {
   };
 
   const handleLogout = async () => {
-    await signOut();
-    navigate('/login');
+  await signOut();
+  setLogoutDialogOpen(false);
+  navigate('/login');
   };
 
   const bottomNavItems = [
@@ -103,7 +144,7 @@ const Dashboard = () => {
                       <Switch
                         id="dark-mode"
                         checked={darkMode}
-                        onCheckedChange={setDarkMode}
+                        onCheckedChange={handleDarkModeChange}
                       />
                     </div>
 
@@ -115,7 +156,7 @@ const Dashboard = () => {
                       <Switch
                         id="notifications"
                         checked={notifications}
-                        onCheckedChange={setNotifications}
+                        onCheckedChange={handleNotificationsChange}
                       />
                     </div>
                   </div>
@@ -126,11 +167,26 @@ const Dashboard = () => {
                   <Button 
                     variant="ghost" 
                     className="w-full justify-start text-destructive hover:text-destructive"
-                    onClick={handleLogout}
+                    onClick={() => setLogoutDialogOpen(true)}
                   >
                     <LogOut className="h-4 w-4 mr-3" />
                     Logout
                   </Button>
+                  <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Are you sure you want to logout?</DialogTitle>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setLogoutDialogOpen(false)}>
+                          No
+                        </Button>
+                        <Button variant="destructive" onClick={handleLogout}>
+                          Yes
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </SheetContent>
             </Sheet>
@@ -146,7 +202,7 @@ const Dashboard = () => {
       </header>
 
       {/* Main Content */}
-      <main className="p-4 pb-20 space-y-6">
+  <main className="p-4 pb-20 space-y-6" style={{ marginBottom: 'env(safe-area-inset-bottom, 32px)' }}>
         {/* Welcome Card */}
         <Card className="bg-gradient-to-r from-primary to-primary-light text-primary-foreground">
           <CardHeader>
@@ -159,6 +215,29 @@ const Dashboard = () => {
 
         {/* Available Farms */}
         <AvailableFarms />
+
+        {/* Blog Posts/Updates */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Farmers Blog & Updates</CardTitle>
+            <CardDescription>Latest news, tips, and updates from your favorite farmers.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Example blog posts, replace with dynamic fetch if needed */}
+              <div className="border rounded p-3">
+                <h4 className="font-semibold mb-1">How to Store Fresh Produce</h4>
+                <p className="text-sm text-muted-foreground">Learn best practices for keeping your veggies fresh longer.</p>
+                <span className="text-xs text-info">Posted by Farmer Joe · 2 days ago</span>
+              </div>
+              <div className="border rounded p-3">
+                <h4 className="font-semibold mb-1">Organic Farming Benefits</h4>
+                <p className="text-sm text-muted-foreground">Discover why organic farming is better for you and the planet.</p>
+                <span className="text-xs text-info">Posted by Green Acres · 5 days ago</span>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-4">
@@ -180,6 +259,11 @@ const Dashboard = () => {
             <CardContent className="p-4 text-center">
               <Package className="h-8 w-8 mx-auto mb-2 text-primary" />
               <p className="font-medium">Track Orders</p>
+              {/* Track Live Recommendation */}
+              <div className="mt-2">
+                <span className="block text-xs text-muted-foreground">Track Live:</span>
+                <span className="block text-xs text-info">Enable live order tracking with map integration or real-time status updates. <br />Recommended: Integrate Google Maps or show delivery driver location.</span>
+              </div>
             </CardContent>
           </Card>
 
@@ -192,8 +276,14 @@ const Dashboard = () => {
         </div>
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-strong">
+      {/* Bottom Navigation - Responsive with Safe Area */}
+      <nav
+        className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-strong"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom, 16px)',
+          zIndex: 100,
+        }}
+      >
         <div className="flex items-center justify-around py-2">
           {bottomNavItems.map((item) => (
             <Button

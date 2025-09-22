@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { getStripe, confirmStripePayment, createPaymentIntent } from "../lib/stripePayment";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,14 +8,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
+
 import { ArrowLeft, MapPin, CreditCard, Banknote, Smartphone } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/CartContext";
 import { useAppState } from "@/contexts/AppStateContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
-
+import PaymentMethodDialog from "@/components/PaymentMethodDialog";
 interface UserProfile {
   name: string;
   address: string;
@@ -37,16 +38,7 @@ const Checkout = () => {
   });
   
   const [selectedPayment, setSelectedPayment] = useState(checkoutData.paymentMethod || "cash");
-  const [bankingDetails, setBankingDetails] = useState(() => {
-    if (checkoutData.bankingDetails) {
-      try {
-        return JSON.parse(checkoutData.bankingDetails);
-      } catch {
-        return { accountName: "", accountNumber: "", bankName: "" };
-      }
-    }
-    return { accountName: "", accountNumber: "", bankName: "" };
-  });
+  // Banking details state removed; only Stripe payment is supported.
   const [isProcessing, setIsProcessing] = useState(false);
   
   // Delivery fee set by farmer - for demo, using fixed value
@@ -117,23 +109,39 @@ const Checkout = () => {
       return;
     }
 
-    if (selectedPayment !== "cash" && (!bankingDetails.accountName || !bankingDetails.accountNumber || !bankingDetails.bankName)) {
-      toast({
-        title: "Missing Payment Details",
-        description: "Please provide all required banking details for this payment method",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Banking details validation removed; only Stripe payment is supported.
 
     setIsProcessing(true);
-
     try {
+      // Stripe payment flow for card
+      if (selectedPayment === "card") {
+        // 1. Create payment intent on backend
+        const { clientSecret } = await createPaymentIntent(total * 100, "usd");
+        // 2. Confirm payment (assumes you have Stripe Elements/CardElement)
+        const result = await confirmStripePayment(clientSecret);
+        if (result.error) {
+          toast({
+            title: "Payment Failed",
+            description: result.error.message,
+            variant: "destructive",
+          });
+          setIsProcessing(false);
+          return;
+        } else if (result.paymentIntent.status !== "succeeded") {
+          toast({
+            title: "Payment Not Completed",
+            description: "Please try again.",
+            variant: "destructive",
+          });
+          setIsProcessing(false);
+          return;
+        }
+      }
+
       // Save checkout data
       updateCheckoutData({
         address: formData.address,
         paymentMethod: selectedPayment,
-        bankingDetails: selectedPayment === "cash" ? "" : JSON.stringify(bankingDetails),
         deliveryFee
       });
 
@@ -144,8 +152,9 @@ const Checkout = () => {
           user_id: user?.id,
           total,
           status: 'pending',
-          payment_status: 'pending',
+          payment_status: selectedPayment === "card" ? 'completed' : 'pending',
           payment_method: selectedPayment,
+          payment_method_selected: selectedPayment,
           shipping_address: formData.address
         })
         .select()
@@ -278,88 +287,7 @@ const Checkout = () => {
           </CardContent>
         </Card>
 
-        {/* Payment Method */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-foreground">
-              <CreditCard className="h-5 w-5" />
-              Payment Method
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RadioGroup value={selectedPayment} onValueChange={setSelectedPayment}>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3 p-3 border rounded-lg">
-                  <RadioGroupItem value="cash" id="cash" />
-                  <Label htmlFor="cash" className="flex items-center gap-2 cursor-pointer flex-1">
-                    <Banknote className="h-5 w-5 text-success" />
-                    <div>
-                      <p className="font-medium text-foreground">Cash on Delivery</p>
-                      <p className="text-sm text-muted-foreground">Pay when you receive your order</p>
-                    </div>
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3 p-3 border rounded-lg">
-                  <RadioGroupItem value="card" id="card" />
-                  <Label htmlFor="card" className="flex items-center gap-2 cursor-pointer flex-1">
-                    <CreditCard className="h-5 w-5 text-info" />
-                    <div>
-                      <p className="font-medium text-foreground">Bank Transfer</p>
-                      <p className="text-sm text-muted-foreground">Transfer to farmer's bank account</p>
-                    </div>
-                  </Label>
-                </div>
-
-                <div className="flex items-center space-x-3 p-3 border rounded-lg">
-                  <RadioGroupItem value="mobile" id="mobile" />
-                  <Label htmlFor="mobile" className="flex items-center gap-2 cursor-pointer flex-1">
-                    <Smartphone className="h-5 w-5 text-warning" />
-                    <div>
-                      <p className="font-medium text-foreground">Mobile Money</p>
-                      <p className="text-sm text-muted-foreground">Pay via mobile wallet</p>
-                    </div>
-                  </Label>
-                </div>
-              </div>
-            </RadioGroup>
-
-            {selectedPayment !== "cash" && (
-              <div className="mt-4 space-y-3">
-                <Label className="text-foreground">Banking Details *</Label>
-                <div className="grid grid-cols-1 gap-3">
-                  <div>
-                    <Label htmlFor="accountName" className="text-foreground">Account Holder Name</Label>
-                    <Input
-                      id="accountName"
-                      value={bankingDetails.accountName}
-                      onChange={e => setBankingDetails(prev => ({ ...prev, accountName: e.target.value }))}
-                      placeholder="Enter account holder name"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="accountNumber" className="text-foreground">Account Number</Label>
-                    <Input
-                      id="accountNumber"
-                      value={bankingDetails.accountNumber}
-                      onChange={e => setBankingDetails(prev => ({ ...prev, accountNumber: e.target.value }))}
-                      placeholder="Enter account number"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="bankName" className="text-foreground">Bank Name</Label>
-                    <Input
-                      id="bankName"
-                      value={bankingDetails.bankName}
-                      onChange={e => setBankingDetails(prev => ({ ...prev, bankName: e.target.value }))}
-                      placeholder="Enter bank name"
-                    />
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* Payment Method section removed. Only Stripe payment via popup will be used. */}
 
         {/* Order Summary */}
         <Card>
@@ -406,14 +334,22 @@ const Checkout = () => {
 
       {/* Fixed Bottom Button */}
       <div className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-strong p-4">
-        <Button 
-          onClick={handlePlaceOrder}
-          disabled={isProcessing}
-          className="w-full"
-          size="lg"
-        >
-          {isProcessing ? 'Processing...' : `Place Order - R${total.toFixed(2)}`}
-        </Button>
+               <PaymentMethodDialog
+          amount={total.toFixed(2)}
+          onPaymentMethodSelect={(method) => {
+            setSelectedPayment(method);
+            handlePlaceOrder();
+          }}
+          trigger={
+            <Button 
+              disabled={isProcessing}
+              className="w-full"
+              size="lg"
+            >
+              {isProcessing ? 'Processing...' : `Place Order - R${total.toFixed(2)}`}
+            </Button>
+          }
+        />
       </div>
     </div>
   );

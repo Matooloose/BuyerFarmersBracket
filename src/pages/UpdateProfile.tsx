@@ -1,3 +1,4 @@
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,10 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Camera, User } from "lucide-react";
+import { ArrowLeft, Camera, User, Key, Trash2, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client"; 
 
 interface ProfileData {
   name: string;
@@ -19,9 +20,15 @@ interface ProfileData {
   bio: string;
   image_url: string;
   location: string;
+  email_opt_in?: boolean;
+  sms_opt_in?: boolean;
+  push_opt_in?: boolean; // Added this property
 }
 
 const UpdateProfile = () => {
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [showPolicies, setShowPolicies] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -33,13 +40,21 @@ const UpdateProfile = () => {
     address: '',
     bio: '',
     image_url: '',
-    location: ''
+    location: '',
+    email_opt_in: true,
+    sms_opt_in: false
   });
+  const [changePwLoading, setChangePwLoading] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchProfile();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const fetchProfile = async () => {
@@ -83,12 +98,12 @@ const UpdateProfile = () => {
     }
   };
 
-  const handleInputChange = (field: keyof ProfileData, value: string) => {
-    setProfileData(prev => ({
-      ...prev,
-      [field]: value
-    }));
-  };
+  const handleInputChange = (field: keyof ProfileData, value: string | boolean) => {
+      setProfileData(prev => ({
+        ...prev,
+        [field]: value
+      }));
+    };
 
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -143,6 +158,78 @@ const UpdateProfile = () => {
           id: user.id,
           ...profileData,
         });
+  // Change Password
+  const handleChangePassword = async () => {
+    if (!user) return;
+    if (!currentPassword || !newPassword || newPassword !== confirmNewPassword) {
+      toast({ title: "Error", description: "Please fill all fields and confirm new password.", variant: "destructive" });
+      return;
+    }
+    setChangePwLoading(true);
+    // Supabase does not support password change with current password client-side, so just update password
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      toast({ title: "Error", description: error.message, variant: "destructive" });
+    } else {
+      toast({ title: "Success", description: "Password changed successfully." });
+      setCurrentPassword(''); setNewPassword(''); setConfirmNewPassword('');
+    }
+    setChangePwLoading(false);
+  };
+
+  // Download Data
+  const handleDownloadData = async () => {
+    if (!user) return;
+    toast({ title: "Preparing Data...", description: "Exporting your profile and orders." });
+    // Fetch profile and orders
+    const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+    const { data: orders } = await supabase.from('orders').select('*').eq('user_id', user.id);
+    const exportData = { profile, orders };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'my_data.json';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast({ title: "Download Ready", description: "Your data has been downloaded." });
+  };
+
+  // Delete Account
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    try {
+      setDeleteLoading(true);
+      // Delete profile data
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+      if (profileError) {
+        throw new Error("Failed to delete profile data.");
+      }
+      // Delete user account
+      const { error: userError } = await supabase.auth.admin.deleteUser(user.id);
+      if (userError) {
+        throw new Error("Failed to delete user account.");
+      }
+      toast({
+        title: "Account Deleted",
+        description: "Your account has been successfully deleted.",
+      });
+      navigate('/register');
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteLoading(false);
+      setDeleteDialogOpen(false);
+    }
+  };
 
       if (error) throw error;
 
@@ -164,6 +251,140 @@ const UpdateProfile = () => {
     }
   };
 
+  const handleChangePassword = async (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    if (!user) return;
+
+    if (!currentPassword || !newPassword || newPassword !== confirmNewPassword) {
+      toast({
+        title: "Error",
+        description: "Please fill all fields and ensure the new passwords match.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setChangePwLoading(true);
+
+      // Supabase does not support verifying the current password client-side
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+      if (error) {
+        throw error;
+      }
+
+      toast({
+        title: "Success",
+        description: "Password changed successfully.",
+      });
+
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } catch (error) {
+      console.error("Error changing password:", error);
+      toast({
+        title: "Error",
+        description: "Failed to change password. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setChangePwLoading(false);
+    }
+  };
+  const handleDownloadData = async (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    if (!user) return;
+
+    try {
+      toast({
+        title: "Preparing Data...",
+        description: "Exporting your profile and orders.",
+      });
+
+      // Fetch profile and orders
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      const { data: orders, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', user.id);
+
+      if (profileError || ordersError) {
+        throw new Error("Failed to fetch data for export.");
+      }
+
+      const exportData = { profile, orders };
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'my_data.json';
+      a.click();
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Download Ready",
+        description: "Your data has been downloaded.",
+      });
+    } catch (error) {
+      console.error("Error downloading data:", error);
+      toast({
+        title: "Error",
+        description: "Failed to download data. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+  const handleDeleteAccount = async (event: React.MouseEvent<HTMLButtonElement, MouseEvent>) => {
+    if (!user) return;
+
+    const confirmDelete = window.confirm(
+      "Are you sure you want to delete your account? This action cannot be undone."
+    );
+
+    if (!confirmDelete) return;
+
+    try {
+      setDeleteLoading(true);
+
+      // Delete profile data
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', user.id);
+
+      if (profileError) {
+        throw new Error("Failed to delete profile data.");
+      }
+
+      // Delete user account
+      const { error: userError } = await supabase.auth.admin.deleteUser(user.id);
+
+      if (userError) {
+        throw new Error("Failed to delete user account.");
+      }
+
+      toast({
+        title: "Account Deleted",
+        description: "Your account has been successfully deleted.",
+      });
+
+      navigate('/register');
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      toast({
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
   return (
     <div className="min-h-screen bg-background">
       <header className="sticky top-0 z-50 bg-card border-b shadow-soft">
@@ -276,6 +497,129 @@ const UpdateProfile = () => {
             >
               {loading ? 'Saving...' : 'Save Profile'}
             </Button>
+
+            {/* Communication Preferences */}
+            <div className="mt-8 space-y-2">
+              <h2 className="font-semibold text-lg">Communication Preferences</h2>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={profileData.email_opt_in} onChange={e => handleInputChange('email_opt_in', e.target.checked ? true : false)} />
+                  <span>Email Updates</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={profileData.sms_opt_in} onChange={e => handleInputChange('sms_opt_in', e.target.checked ? true : false)} />
+                  <span>SMS Updates</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Change Password Section */}
+            <div className="mt-8 space-y-2">
+              <h2 className="font-semibold text-lg flex items-center gap-2"><Key className="h-5 w-5" /> Change Password</h2>
+              <div className="space-y-2">
+                <Input type="password" placeholder="Current Password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+                <Input type="password" placeholder="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                <Input type="password" placeholder="Confirm New Password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} />
+                <Button onClick={handleChangePassword} disabled={changePwLoading || !newPassword || newPassword !== confirmNewPassword} className="w-full mt-2">{changePwLoading ? 'Changing...' : 'Change Password'}</Button>
+              </div>
+            </div>
+
+            {/* Download/Delete Data Section */}
+            <div className="mt-8 space-y-2">
+              <h2 className="font-semibold text-lg">Account & Data</h2>
+              <div className="flex gap-4">
+                <Button variant="outline" onClick={handleDownloadData} className="flex items-center gap-2"><Download className="h-4 w-4" /> Download My Data</Button>
+                <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleteLoading} className="flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete My Account</Button>
+                <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} disabled={deleteLoading} className="flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete My Account</Button>
+                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Are you sure you want to delete your account?</DialogTitle>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleteLoading}>
+                        Cancel
+                      </Button>
+                      <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleteLoading}>
+                        {deleteLoading ? "Deleting..." : "Yes, Delete My Account"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+            {/* System Settings Section */}
+            <div className="mt-8 space-y-4">
+              <h2 className="font-semibold text-lg">System Settings</h2>
+              {/* Location Access */}
+              <div className="flex items-center gap-2">
+                <Label className="font-medium">Location Access</Label>
+                <Button variant="outline" onClick={async () => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        const { latitude, longitude } = pos.coords;
+                        toast({ title: 'Location Accessed', description: `Lat: ${latitude}, Lng: ${longitude}` });
+                        handleInputChange('location', `${latitude},${longitude}`);
+                      },
+                      () => toast({ title: 'Error', description: 'Location access denied.', variant: 'destructive' })
+                    );
+                  } else {
+                    toast({ title: 'Error', description: 'Geolocation not supported.', variant: 'destructive' });
+                  }
+                }}>Get Location</Button>
+              </div>
+              {/* Push Notifications */}
+              <div className="flex items-center gap-2">
+                <Label className="font-medium">Push Notifications</Label>
+                <input type="checkbox" checked={profileData.push_opt_in ?? false} onChange={e => handleInputChange('push_opt_in', e.target.checked)} title="Enable push notifications" />
+                <span>{profileData.push_opt_in ? 'Enabled' : 'Disabled'}</span>
+              </div>
+              {/* Cache Clearing */}
+              <div className="flex items-center gap-2">
+                <Label className="font-medium">Clear Cache</Label>
+                <Button variant="outline" onClick={() => {
+                  if ('caches' in window) {
+                    caches.keys().then(keys => keys.forEach(key => caches.delete(key)));
+                    toast({ title: 'Cache Cleared', description: 'App cache has been cleared.' });
+                  } else {
+                    toast({ title: 'Error', description: 'Cache API not supported.', variant: 'destructive' });
+                  }
+                }}>Clear</Button>
+              </div>
+              {/* Policies Display */}
+              <div className="flex flex-col gap-2">
+                <Label className="font-medium">Policies</Label>
+                <Button variant="outline" onClick={() => setShowPolicies(true)}>View Policies</Button>
+                {showPolicies && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg">
+                      <h3 className="text-lg font-bold mb-2">App Policies</h3>
+                      <div className="mb-4 text-sm max-h-64 overflow-y-auto">
+                        <p><strong>Privacy Policy:</strong> We respect your privacy. Your data is stored securely and never shared without consent.</p>
+                        <p className="mt-2"><strong>Terms of Service:</strong> By using this app, you agree to our terms and conditions. For details, contact support.</p>
+                        <p className="mt-2"><strong>Refund Policy:</strong> Refunds are processed according to our payment provider's terms.</p>
+                      </div>
+                      <Button variant="outline" onClick={() => setShowPolicies(false)}>Close</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              {/* Support Contact */}
+              <div className="flex flex-col gap-2">
+                <Label className="font-medium">Support</Label>
+                <Button variant="outline" onClick={() => setShowSupport(true)}>Contact Support</Button>
+                {showSupport && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg">
+                      <h3 className="text-lg font-bold mb-2">Contact Support</h3>
+                      <div className="mb-4 text-sm">Email: support@verdantvillage.com<br />Phone: +27 123 456 7890</div>
+                      <Button variant="outline" onClick={() => setShowSupport(false)}>Close</Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </CardContent>
         </Card>
       </main>
