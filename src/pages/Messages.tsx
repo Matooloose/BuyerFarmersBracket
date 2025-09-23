@@ -14,7 +14,7 @@ import { useAppState } from "@/contexts/AppStateContext";
 
 interface UserProfile {
   id: string;
-  name: string;
+  name: string | null;
   image_url: string | null;
 }
 
@@ -49,6 +49,47 @@ const Messages: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
   const [showChatList, setShowChatList] = useState(true);
   const [userList, setUserList] = useState<UserProfile[]>([]);
+  const [realtimeChannel, setRealtimeChannel] = useState<any>(null);
+
+  // Real-time subscription for messages
+  useEffect(() => {
+    if (!user || !selectedUser) return;
+
+    const channel = supabase
+      .channel('messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chats',
+          filter: `or(and(sender_id.eq.${user.id},receiver_id.eq.${selectedUser.id}),and(sender_id.eq.${selectedUser.id},receiver_id.eq.${user.id}))`
+        },
+        (payload) => {
+          console.log('New message received:', payload);
+          setMessages(prev => [...prev, payload.new as Message]);
+          
+          // Show notification for received messages
+          if (payload.new.sender_id !== user.id) {
+            addNotification({
+              title: "New Message",
+              message: `New message from ${selectedUser.name || 'user'}`,
+              type: "admin",
+              read: false,
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    setRealtimeChannel(channel);
+
+    return () => {
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [user, selectedUser, addNotification]);
 
   const checkSubscription = useCallback(async () => {
     if (!user) return;
@@ -155,30 +196,36 @@ const Messages: React.FC = () => {
 
   const sendMessage = useCallback(async () => {
     if (!newMessage.trim() || !user || !selectedUser) return;
+    
+    const messageText = newMessage.trim();
+    setNewMessage(""); // Clear input immediately for better UX
+    
     try {
       const { error } = await supabase
         .from("chats")
         .insert({
           sender_id: user.id,
           receiver_id: selectedUser.id,
-          message: newMessage.trim()
+          message: messageText,
+          is_read: false
         });
+      
       if (error) throw error;
-      setNewMessage("");
-      fetchMessages(selectedUser.id);
+      
       toast({
         title: "Message sent!",
-        description: `Your message has been sent to ${selectedUser.name ? selectedUser.name : "user"}.`,
+        description: `Your message has been sent to ${selectedUser.name || "user"}.`,
       });
     } catch (error) {
       console.error("Error sending message:", error);
+      setNewMessage(messageText); // Restore message on error
       toast({
         title: "Error",
         description: "Failed to send message. Please try again.",
         variant: "destructive"
       });
     }
-  }, [newMessage, user, selectedUser, fetchMessages, toast]);
+  }, [newMessage, user, selectedUser, toast]);
 
   useEffect(() => {
     if (user) {

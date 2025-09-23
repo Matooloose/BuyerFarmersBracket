@@ -37,7 +37,7 @@ interface Order {
   itemCount: number;
   items: OrderItem[];
   paymentStatus: 'pending' | 'completed' | 'failed';
-  shippingAddress: string;
+  shippingAddress: string | null;
 }
 
 interface OrderItem {
@@ -99,7 +99,7 @@ const OrderHistory = () => {
           itemCount: 1, // Will be calculated when order_items table is available
           items: [], // Will be populated when order_items table is available
           paymentStatus: order.payment_status,
-          shippingAddress: order.shipping_address
+          shippingAddress: order.shipping_address || 'No address provided'
         }));
 
         setOrders(transformedOrders);
@@ -152,7 +152,7 @@ const OrderHistory = () => {
         itemCount: 1,
         items: [],
         paymentStatus: order.payment_status,
-        shippingAddress: order.shipping_address
+        shippingAddress: order.shipping_address || 'No address provided'
       }));
 
       setOrders(transformedOrders);

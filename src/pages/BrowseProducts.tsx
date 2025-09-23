@@ -68,7 +68,7 @@ const getProductReviews = (productId: string): Review[] => {
 interface Product {
   id: string;
   name: string;
-  description: string;
+  description: string | null;
   price: number;
   unit: string;
   category: string;
@@ -363,7 +363,7 @@ function BrowseProducts() {
                           )}
                         </div>
                         <p className="text-sm text-muted-foreground line-clamp-2">
-                          {product.description}
+                          {product.description || 'No description available'}
                         </p>
                         <div className="flex items-center justify-between">
                           <div>

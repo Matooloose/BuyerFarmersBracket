@@ -9,10 +9,10 @@ import "../farm-map.css";
 interface Farm {
   id: string;
   name: string;
-  description: string;
-  location: string;
+  description: string | null;
+  location: string | null;
   address?: string;
-  image_url: string;
+  image_url: string | null;
   farmer_id: string;
 }
 

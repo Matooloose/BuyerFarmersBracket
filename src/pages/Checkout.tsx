@@ -18,9 +18,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import PaymentMethodDialog from "@/components/PaymentMethodDialog";
 interface UserProfile {
-  name: string;
-  address: string;
-  phone: string;
+  name: string | null;
+  address: string | null;
+  phone: string | null;
 }
 
 const Checkout = () => {
@@ -120,10 +120,14 @@ const Checkout = () => {
       });
 
       // Create order in database
+      if (!user?.id) {
+        throw new Error('User not authenticated');
+      }
+
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .insert({
-          user_id: user?.id,
+          user_id: user.id,
           total,
           status: 'pending',
           payment_status: 'pending',
