@@ -34,6 +34,7 @@ import {
   Home,
   ShoppingCart,
   Package,
+  MessageCircle,
   Grid3X3,
   List
 } from "lucide-react";
@@ -186,11 +187,11 @@ function BrowseProducts() {
     
 
   const bottomNavItems = [
-    { icon: Home, label: "Home", path: "/home" },
+    { icon: Home, label: "Home", path: "/dashboard" },
     { icon: ShoppingCart, label: "Cart", path: "/cart" },
     { icon: Package, label: "Track", path: "/track-order" },
-    
     { icon: Search, label: "Browse", path: "/browse-products", active: true },
+    { icon: MessageCircle, label: "Messages", path: "/messages" },
   ];
 
   const productsToShow = showWishlist

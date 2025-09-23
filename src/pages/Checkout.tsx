@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStripe, confirmStripePayment, createPaymentIntent } from "../lib/stripePayment";
+import { payFastService } from "../lib/payfast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Separator } from "@/components/ui/separator";
 
-import { ArrowLeft, MapPin, CreditCard, Banknote, Smartphone } from "lucide-react";
+import { ArrowLeft, MapPin, CreditCard, Banknote, Smartphone, ShieldCheck } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/CartContext";
 import { useAppState } from "@/contexts/AppStateContext";
@@ -48,7 +49,7 @@ const Checkout = () => {
 
   useEffect(() => {
     if (cartItems.length === 0) {
-      navigate('/home');
+      navigate('/dashboard');
       return;
     }
     
@@ -109,35 +110,8 @@ const Checkout = () => {
       return;
     }
 
-    // Banking details validation removed; only Stripe payment is supported.
-
     setIsProcessing(true);
     try {
-      // Stripe payment flow for card
-      if (selectedPayment === "card") {
-        // 1. Create payment intent on backend
-        const { clientSecret } = await createPaymentIntent(total * 100, "usd");
-        // 2. Confirm payment (assumes you have Stripe Elements/CardElement)
-        const result = await confirmStripePayment(clientSecret);
-        if (result.error) {
-          toast({
-            title: "Payment Failed",
-            description: result.error.message,
-            variant: "destructive",
-          });
-          setIsProcessing(false);
-          return;
-        } else if (result.paymentIntent.status !== "succeeded") {
-          toast({
-            title: "Payment Not Completed",
-            description: "Please try again.",
-            variant: "destructive",
-          });
-          setIsProcessing(false);
-          return;
-        }
-      }
-
       // Save checkout data
       updateCheckoutData({
         address: formData.address,
@@ -152,9 +126,8 @@ const Checkout = () => {
           user_id: user?.id,
           total,
           status: 'pending',
-          payment_status: selectedPayment === "card" ? 'completed' : 'pending',
+          payment_status: 'pending',
           payment_method: selectedPayment,
-          payment_method_selected: selectedPayment,
           shipping_address: formData.address
         })
         .select()
@@ -176,7 +149,74 @@ const Checkout = () => {
 
       if (itemsError) throw itemsError;
 
-      // Add success notification
+      // Handle different payment methods
+      if (selectedPayment === "payfast") {
+        // Redirect to PayFast
+        const paymentData = await payFastService.createPayment({
+          amount: total,
+          itemName: `FarmersBracket Order #${orderData.id.slice(-6)}`,
+          itemDescription: `Order with ${cartItems.length} item(s)`,
+          customerEmail: user?.email,
+          customerName: formData.fullName,
+          customerCell: formData.phoneNumber,
+          orderId: orderData.id
+        });
+
+        // Redirect to PayFast
+        payFastService.redirectToPayment(paymentData);
+        return; // Don't continue execution as we're redirecting
+
+      } else if (selectedPayment === "card") {
+        // Stripe payment flow
+        const { clientSecret } = await createPaymentIntent(total * 100, "usd");
+        const result = await confirmStripePayment(clientSecret);
+        
+        if (result.error) {
+          toast({
+            title: "Payment Failed",
+            description: result.error.message,
+            variant: "destructive",
+          });
+          setIsProcessing(false);
+          return;
+        } else if (result.paymentIntent.status !== "succeeded") {
+          toast({
+            title: "Payment Not Completed",
+            description: "Please try again.",
+            variant: "destructive",
+          });
+          setIsProcessing(false);
+          return;
+        }
+
+        // Update order status for successful card payment
+        await supabase
+          .from('orders')
+          .update({
+            payment_status: 'completed',
+            status: 'processing'
+          })
+          .eq('id', orderData.id);
+
+      } else if (selectedPayment === "eft") {
+        // Manual EFT - send instructions
+        toast({
+          title: "EFT Payment Instructions",
+          description: "You'll receive banking details via email. Order will be processed after payment verification.",
+        });
+
+      } else if (selectedPayment === "cash") {
+        // Cash on delivery - no immediate payment needed
+        await supabase
+          .from('orders')
+          .update({
+            payment_method: 'cash',
+            status: 'processing'
+          })
+          .eq('id', orderData.id);
+      }
+
+      // Add success notification (for non-PayFast payments)
       addNotification({
         title: "Order Placed Successfully!",
         message: `Your order #${orderData.id.slice(0, 8)} has been placed and is being processed.`,

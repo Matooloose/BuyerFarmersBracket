@@ -1,4 +1,4 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -535,6 +535,9 @@ const UpdateProfile = () => {
                   <DialogContent>
                     <DialogHeader>
                       <DialogTitle>Are you sure you want to delete your account?</DialogTitle>
+                      <DialogDescription>
+                        This action cannot be undone. This will permanently delete your account and all associated data.
+                      </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleteLoading}>

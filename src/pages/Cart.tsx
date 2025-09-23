@@ -77,10 +77,11 @@ const Cart = () => {
   };
 
   const bottomNavItems = [
-    { icon: Home, label: "Home", path: "/home" },
+    { icon: Home, label: "Home", path: "/dashboard" },
     { icon: ShoppingCart, label: "Cart", path: "/cart", active: true },
     { icon: Package, label: "Track", path: "/track-order" },
     { icon: Search, label: "Browse", path: "/browse-products" },
+    { icon: MessageCircle, label: "Messages", path: "/messages" },
   ];
 
   return (
@@ -108,7 +109,7 @@ const Cart = () => {
             <ShoppingCart className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-xl font-semibold text-foreground mb-2">Your cart is empty</h2>
             <p className="text-muted-foreground mb-6">Add some fresh products to get started</p>
-            <Button onClick={() => navigate('/home')} className="bg-gradient-to-r from-primary to-primary-light">
+            <Button onClick={() => navigate('/dashboard')} className="bg-gradient-to-r from-primary to-primary-light">
               Start Shopping
             </Button>
           </div>

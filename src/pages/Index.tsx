@@ -12,7 +12,7 @@ const Index = () => {
   useEffect(() => {
     if (user) {
       if (hasCompletedWelcome) {
-        navigate('/home');
+        navigate('/dashboard');
       } else {
         navigate('/welcome');
       }

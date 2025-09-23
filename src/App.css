@@ -40,3 +40,9 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Safe area support for mobile devices */
+.safe-area-bottom-nav {
+  padding-bottom: env(safe-area-inset-bottom, 16px);
+  z-index: 100;
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { MapPin, Truck, Clock, CheckCircle } from "lucide-react";
 
@@ -90,6 +90,9 @@ const LiveTrackingDialog = ({ orderId, trigger }: LiveTrackingDialogProps) => {
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>Live Order Tracking</DialogTitle>
+          <DialogDescription>
+            Track your order in real-time from farm to your doorstep.
+          </DialogDescription>
         </DialogHeader>
         
         <div className="space-y-6">

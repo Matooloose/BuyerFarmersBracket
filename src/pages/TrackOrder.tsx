@@ -172,11 +172,11 @@ const TrackOrder = () => {
   };
 
   const bottomNavItems = [
-    { icon: Home, label: "Home", path: "/home" },
+    { icon: Home, label: "Home", path: "/dashboard" },
     { icon: ShoppingCart, label: "Cart", path: "/cart" },
     { icon: Package, label: "Track", path: "/track-order", active: true },
-    
     { icon: Search, label: "Browse", path: "/browse-products" },
+    { icon: MessageCircle, label: "Messages", path: "/messages" },
   ];
 
   async function fetchOrderDetails(order: Order) {
@@ -250,7 +250,7 @@ const TrackOrder = () => {
             <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
             <h2 className="text-xl font-semibold text-foreground mb-2">No orders yet</h2>
             <p className="text-muted-foreground mb-6">Start shopping to see your orders here</p>
-            <Button onClick={() => navigate('/home')} className="bg-gradient-to-r from-primary to-primary-light">
+            <Button onClick={() => navigate('/dashboard')} className="bg-gradient-to-r from-primary to-primary-light">
               Start Shopping
             </Button>
           </div>
