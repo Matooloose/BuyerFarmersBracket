@@ -73,19 +73,30 @@ const TrackOrder = () => {
       setLoading(true);
       const { data, error } = await supabase
         .from('orders')
-        .select('*')
+        .select(`
+          *,
+          order_items (
+            id,
+            quantity,
+            unit_price,
+            products (
+              name,
+              farmer_id
+            )
+          )
+        `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
       if (error) {
         setOrders([]);
       } else {
-        // You may need to map/format data to match the Order interface
+        // Map data to match the Order interface with proper item counts
         setOrders((data || []).map(order => ({
           id: order.id,
           orderNumber: order.id,
           status: order.status,
           total: order.total,
-          items: 1, // Will be updated when fetching order items
+          items: order.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0,
           estimatedDelivery: '',
           farmName: '',
           trackingId: '',

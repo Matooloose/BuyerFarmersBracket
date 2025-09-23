@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { notificationService } from "@/lib/notificationService";
 // Removed unused import for useAuth as it is not used in this file.
 
 interface AuthContextType {
@@ -33,18 +34,40 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      // Initialize notifications for authenticated user
+      if (session?.user) {
+        initializeNotifications(session.user.id);
+      }
     });
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      
+      if (session?.user) {
+        // Initialize notifications when user logs in
+        await initializeNotifications(session.user.id);
+      } else {
+        // Clean up when user logs out
+        await notificationService.unsubscribe();
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
+
+  const initializeNotifications = async (userId: string) => {
+    try {
+      await notificationService.initialize();
+      await notificationService.subscribeToRealTimeUpdates(userId);
+    } catch (error) {
+      console.error('Failed to initialize notifications:', error);
+    }
+  };
 
   const signIn = async (email: string, password: string) => {
     try {
@@ -69,7 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       return {};
     } catch (error) {
-      return { error };
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
     }
   };
 
@@ -102,7 +125,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       
       return {};
     } catch (error) {
-      return { error };
+      return { error: error instanceof Error ? error : new Error('Unknown error') };
     }
   };
 

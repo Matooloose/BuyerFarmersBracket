@@ -1,3 +1,4 @@
+import React, { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,30 +9,30 @@ import { CartProvider } from "./contexts/CartContext";
 import { AppStateProvider } from "./contexts/AppStateContext";
 import { WishlistProvider } from "./contexts/WishlistContext";
 
-// Pages
-import Index from "./pages/Index";
-import Welcome from "./pages/Welcome";
-import Login from "./pages/Login";
-import Register from "./pages/Register";
-import Dashboard from "./pages/Dashboard";
-import Cart from "./pages/Cart";
-import TrackOrder from "./pages/TrackOrder";
-import BrowseProducts from "./pages/BrowseProducts";
-import Checkout from "./pages/Checkout";
-import UpdateProfile from "./pages/UpdateProfile";
-import Subscriptions from "./pages/Subscriptions";
-import Messages from "./pages/Messages";
-import NotFound from "./pages/NotFound";
-import FarmerProfile from "./pages/FarmerProfile";
-import HowItWorks from "./pages/HowItWorks";
-import ContactSupport from "./pages/ContactSupport";
-import Wishlist from "./pages/Wishlist";
-import OrderHistory from "./pages/OrderHistory";
-import FAQ from "./pages/FAQ";
-import PaymentSuccess from "./pages/PaymentSuccess";
-import PaymentCancelled from "./pages/PaymentCancelled";
-import Reports from "./pages/Reports";
-import PayFastTest from "./pages/PayFastTest";
+// Lazy load pages for better performance
+const Index = React.lazy(() => import("./pages/Index"));
+const Welcome = React.lazy(() => import("./pages/Welcome"));
+const Login = React.lazy(() => import("./pages/Login"));
+const Register = React.lazy(() => import("./pages/Register"));
+const Dashboard = React.lazy(() => import("./pages/Dashboard"));
+const Cart = React.lazy(() => import("./pages/Cart"));
+const TrackOrder = React.lazy(() => import("./pages/TrackOrder"));
+const BrowseProducts = React.lazy(() => import("./pages/BrowseProducts"));
+const Checkout = React.lazy(() => import("./pages/Checkout"));
+const UpdateProfile = React.lazy(() => import("./pages/UpdateProfile"));
+const Subscriptions = React.lazy(() => import("./pages/Subscriptions"));
+const Messages = React.lazy(() => import("./pages/Messages"));
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+const FarmerProfile = React.lazy(() => import("./pages/FarmerProfile"));
+const HowItWorks = React.lazy(() => import("./pages/HowItWorks"));
+const ContactSupport = React.lazy(() => import("./pages/ContactSupport"));
+const Wishlist = React.lazy(() => import("./pages/Wishlist"));
+const OrderHistory = React.lazy(() => import("./pages/OrderHistory"));
+const FAQ = React.lazy(() => import("./pages/FAQ"));
+const PaymentSuccess = React.lazy(() => import("./pages/PaymentSuccess"));
+const PaymentCancelled = React.lazy(() => import("./pages/PaymentCancelled"));
+const Reports = React.lazy(() => import("./pages/Reports"));
+const PayFastTest = React.lazy(() => import("./pages/PayFastTest"));
 
 const queryClient = new QueryClient();
 
@@ -50,35 +51,44 @@ const App = () => (
                   v7_relativeSplatPath: true
                 }}
               >
-            <Routes>
-              <Route path="/" element={<Login />} />
-              <Route path="/welcome" element={<Welcome />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/home" element={<Dashboard />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/track-order" element={<TrackOrder />} />
-              <Route path="/browse-products" element={<BrowseProducts />} />
-              <Route path="/checkout" element={<Checkout />} />
-              <Route path="/profile" element={<UpdateProfile />} />
-              <Route path="/update-profile" element={<UpdateProfile />} />
-              <Route path="/subscriptions" element={<Subscriptions />} />
-              <Route path="/messages" element={<Messages />} />
-              <Route path="/wishlist" element={<Wishlist />} />
-              <Route path="/order-history" element={<OrderHistory />} />
-              <Route path="/farmer/:id" element={<FarmerProfile />} />
-              <Route path="/how-it-works" element={<HowItWorks />} />
-              <Route path="/contact-support" element={<ContactSupport />} />
-              <Route path="/faq" element={<FAQ />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/payment-success" element={<PaymentSuccess />} />
-              <Route path="/payment-cancelled" element={<PaymentCancelled />} />
-              <Route path="/payfast-test" element={<PayFastTest />} />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
+                <Suspense fallback={
+                  <div className="min-h-screen bg-background flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                      <p className="text-muted-foreground">Loading...</p>
+                    </div>
+                  </div>
+                }>
+                  <Routes>
+                    <Route path="/" element={<Login />} />
+                    <Route path="/welcome" element={<Welcome />} />
+                    <Route path="/login" element={<Login />} />
+                    <Route path="/register" element={<Register />} />
+                    <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/home" element={<Dashboard />} />
+                    <Route path="/cart" element={<Cart />} />
+                    <Route path="/track-order" element={<TrackOrder />} />
+                    <Route path="/browse-products" element={<BrowseProducts />} />
+                    <Route path="/checkout" element={<Checkout />} />
+                    <Route path="/profile" element={<UpdateProfile />} />
+                    <Route path="/update-profile" element={<UpdateProfile />} />
+                    <Route path="/subscriptions" element={<Subscriptions />} />
+                    <Route path="/messages" element={<Messages />} />
+                    <Route path="/wishlist" element={<Wishlist />} />
+                    <Route path="/order-history" element={<OrderHistory />} />
+                    <Route path="/farmer/:id" element={<FarmerProfile />} />
+                    <Route path="/how-it-works" element={<HowItWorks />} />
+                    <Route path="/contact-support" element={<ContactSupport />} />
+                    <Route path="/faq" element={<FAQ />} />
+                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/payment-success" element={<PaymentSuccess />} />
+                    <Route path="/payment-cancelled" element={<PaymentCancelled />} />
+                    <Route path="/payfast-test" element={<PayFastTest />} />
+                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                    <Route path="*" element={<NotFound />} />
+                  </Routes>
+                </Suspense>
+              </BrowserRouter>
             </WishlistProvider>
           </CartProvider>
         </AppStateProvider>

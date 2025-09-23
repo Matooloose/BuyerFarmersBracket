@@ -263,10 +263,23 @@ export class ReportGenerator {
         totalProducts,
         totalSales,
         revenue,
-        rating: 4.5, // Placeholder until rating system is implemented
+        rating: this.calculateFarmerRating(totalSales, revenue, totalProducts),
         joinDate: farmer.created_at
       };
     });
+  }
+
+  private calculateFarmerRating(totalSales: number, revenue: number, totalProducts: number): number {
+    // Calculate a simple rating based on performance metrics
+    const salesScore = Math.min(totalSales / 10, 1); // Up to 1 point for sales (normalized)
+    const revenueScore = Math.min(revenue / 1000, 1); // Up to 1 point for revenue (normalized)
+    const productScore = Math.min(totalProducts / 5, 1); // Up to 1 point for product variety
+    
+    // Base rating starts at 3, with bonuses for performance
+    const baseRating = 3.0;
+    const bonusRating = (salesScore + revenueScore + productScore) * 2; // Up to 2 bonus points
+    
+    return Math.min(Math.round((baseRating + bonusRating) * 10) / 10, 5.0); // Round to 1 decimal, max 5.0
   }
 
   private generateSummary(orders: OrderReport[], products: ProductReport[], farmers: FarmerReport[]): ReportSummary {

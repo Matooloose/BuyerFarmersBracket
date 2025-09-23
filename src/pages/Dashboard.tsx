@@ -190,7 +190,13 @@ const fetchRecentOrders = async () => {
   try {
     const { data, error } = await supabase
       .from('orders')
-      .select('id, status, total, created_at')
+      .select(`
+        id, status, total, created_at,
+        order_items (
+          id,
+          quantity
+        )
+      `)
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
       .limit(3);
@@ -206,7 +212,7 @@ const fetchRecentOrders = async () => {
       status: order.status as RecentOrder['status'],
       total: order.total,
       createdAt: order.created_at,
-      itemCount: 1 // Placeholder until we have order_items
+      itemCount: order.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0
     }));
 
     setRecentOrders(transformedOrders);

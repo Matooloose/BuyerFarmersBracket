@@ -72,11 +72,28 @@ const OrderHistory = () => {
       setLoading(true);
       setError(null);
       try {
-        // Check if orders table exists and fetch basic order data
+        // Check if orders table exists and fetch order data with related items and farm info
         // Note: Adjust column names based on your actual database schema
         const { data: ordersData, error: ordersError } = await supabase
           .from('orders')
-          .select('*')
+          .select(`
+            *,
+            order_items (
+              id,
+              quantity,
+              unit_price,
+              products (
+                id,
+                name,
+                images,
+                farmer_id,
+                farms!products_farmer_id_fkey (
+                  id,
+                  name
+                )
+              )
+            )
+          `)
           .eq('user_id', user.id)
           .order('created_at', { ascending: false });
 
@@ -88,19 +105,31 @@ const OrderHistory = () => {
         }
 
         // Transform the data to match our interface
-        const transformedOrders: Order[] = (ordersData || []).map((order, index) => ({
-          id: order.id,
-          orderNumber: order.id, // Using order ID as order number since order_number doesn't exist
-          status: order.status,
-          total: order.total,
-          createdAt: order.created_at,
-          deliveryDate: undefined, // No delivery_date in schema
-          farmName: 'Local Farm', // Will be populated when farm data is available
-          itemCount: 1, // Will be calculated when order_items table is available
-          items: [], // Will be populated when order_items table is available
-          paymentStatus: order.payment_status,
-          shippingAddress: order.shipping_address || 'No address provided'
-        }));
+        const transformedOrders: Order[] = (ordersData || []).map((order, index) => {
+          // Get farm name from the first product's farm
+          const firstProduct = order.order_items?.[0]?.products;
+          const farmName = 'Local Farm'; // Simplified for now
+          
+          return {
+            id: order.id,
+            orderNumber: order.id, // Using order ID as order number since order_number doesn't exist
+            status: order.status,
+            total: order.total,
+            createdAt: order.created_at,
+            deliveryDate: undefined, // No delivery_date in schema
+            farmName: farmName,
+            itemCount: order.order_items?.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0) || 0,
+            items: order.order_items?.map((item: any) => ({
+              id: item.id,
+              productName: item.products?.name || 'Product',
+              quantity: item.quantity,
+              unitPrice: item.unit_price,
+              total: item.quantity * item.unit_price
+            })) || [],
+            paymentStatus: order.payment_status,
+            shippingAddress: order.shipping_address || 'No address provided'
+          };
+        });
 
         setOrders(transformedOrders);
       } catch (error) {

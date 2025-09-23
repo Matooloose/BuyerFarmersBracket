@@ -1,5 +1,6 @@
 import React from "react";
 import { RotateCcw, ChevronDown } from "lucide-react";
+import "./pull-to-refresh.css";
 
 interface PullToRefreshIndicatorProps {
   isVisible: boolean;
@@ -20,13 +21,18 @@ const PullToRefreshIndicator: React.FC<PullToRefreshIndicatorProps> = ({
 }) => {
   if (!isVisible) return null;
 
+  // Calculate transform and opacity values within safe bounds
+  const safeTransformY = Math.min(transformY, 50);
+  const safeOpacity = Math.min(opacity, 1);
+
   return (
     <div 
-      className="fixed top-0 left-0 right-0 z-40 flex justify-center pt-2 transition-all duration-200"
+      className="pull-to-refresh-indicator"
+      data-transform-y
       style={{ 
-        transform: `translateY(${Math.min(transformY, 50)}px)`,
-        opacity: Math.min(opacity, 1)
-      }}
+        '--transform-y': `${safeTransformY}px`,
+        '--opacity': safeOpacity
+      } as React.CSSProperties}
     >
       <div className="bg-card/90 backdrop-blur-sm border rounded-full px-4 py-2 shadow-lg">
         <div className="flex items-center gap-2 text-sm">

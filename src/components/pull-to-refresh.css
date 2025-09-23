@@ -1,0 +1,17 @@
+/* Pull to refresh indicator styles */
+.pull-to-refresh-indicator {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: flex;
+  justify-content: center;
+  padding-top: 8px;
+  transition: all 0.2s;
+}
+
+.pull-to-refresh-indicator[data-transform-y] {
+  transform: translateY(var(--transform-y, 0px));
+  opacity: var(--opacity, 1);
+}
