@@ -18,6 +18,7 @@ import {
   DialogClose
 } from "@/components/ui/dialog";
 import LiveTrackingDialog from "@/components/LiveTrackingDialog";
+import BottomNav from "@/components/BottomNav";
 import { 
   ArrowLeft,
   Package,
@@ -230,24 +231,27 @@ const TrackOrder = () => {
           <Button variant="ghost" size="sm" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <div className="text-center">
-            <h1 className="text-lg font-semibold text-foreground">Track Orders</h1>
-            <p className="text-sm text-muted-foreground">{orders.length} orders</p>
+          <h2 className="text-xl font-semibold text-foreground">Track Your Order</h2>
+          <div className="flex items-center space-x-2">
+            <Button variant="outline" size="sm" onClick={() => navigate('/home')}>
+              <Home className="h-5 w-5" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => navigate('/cart')}>
+              <ShoppingCart className="h-5 w-5" />
+            </Button>
           </div>
-          <div className="w-9" /> {/* Spacer for centering */}
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="p-4 pb-20">
+      <main className="p-4">
         {loading ? (
-          <div className="text-center py-16">
-            <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-            <h2 className="text-xl font-semibold text-foreground mb-2">Loading orders...</h2>
+          <div className="flex items-center justify-center h-full">
+            <span className="loader"></span>
           </div>
         ) : orders.length === 0 ? (
-          <div className="text-center py-16">
-            <Package className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+          <div className="text-center py-20">
+            <Package className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <h2 className="text-xl font-semibold text-foreground mb-2">No orders yet</h2>
             <p className="text-muted-foreground mb-6">Start shopping to see your orders here</p>
             <Button onClick={() => navigate('/home')} className="bg-gradient-to-r from-primary to-primary-light">

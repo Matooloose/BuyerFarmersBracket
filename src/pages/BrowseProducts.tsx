@@ -42,6 +42,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/CartContext";
 import { Badge } from "@/components/ui/badge";
+import BottomNav from "@/components/BottomNav";
 
 type Review = {
   productId: string;
@@ -401,32 +402,8 @@ function BrowseProducts() {
         )}
       </main>
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-strong">
-        <div className="flex items-center justify-around py-2">
-          {bottomNavItems.map((item) => (
-            <Button
-              key={item.path}
-              variant="ghost"
-              size="sm"
-              className={`flex flex-col items-center px-3 py-2 h-auto ${
-                item.active ? 'text-primary' : ''
-              }`}
-              onClick={() => navigate(item.path)}
-            >
-              <div className="relative">
-                <item.icon className="h-5 w-5 mb-1" />
-                {item.label === "Cart" && getTotalItems() > 0 && (
-                  <Badge className="absolute -top-2 -right-2 text-xs px-1 py-0.5 rounded-full bg-primary text-white">
-                    {getTotalItems()}
-                  </Badge>
-                )}
-              </div>
-              <span className="text-xs">{item.label}</span>
-            </Button>
-          ))}
-        </div>
-      </nav>
+      {/* Shared Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 }

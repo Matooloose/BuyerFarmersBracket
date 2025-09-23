@@ -7,10 +7,21 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { ArrowLeft, Camera, User, Key, Trash2, Download } from "lucide-react";
+import { ArrowLeft, Camera, User, Key, Trash2, Download, Bell, LogOut } from "lucide-react";
+import { Sun } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client"; 
+import BottomNav from "@/components/BottomNav";
+
+export default function UpdateProfileWrapper() {
+  return (
+    <>
+      <UpdateProfile />
+      <BottomNav />
+    </>
+  );
+}
 
 interface ProfileData {
   name: string;
@@ -26,6 +37,23 @@ interface ProfileData {
 }
 
 const UpdateProfile = () => {
+  // Handler for dark mode toggle
+  const handleDarkModeChange = (checked: boolean) => {
+    setDarkMode(checked);
+    if (checked) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  // Handler for notifications toggle
+  const handleNotificationsChange = (checked: boolean) => {
+    setNotifications(checked);
+    localStorage.setItem('notifications', checked ? 'true' : 'false');
+  };
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [showPolicies, setShowPolicies] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
@@ -49,6 +77,8 @@ const UpdateProfile = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [notifications, setNotifications] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -498,6 +528,66 @@ const UpdateProfile = () => {
               {loading ? 'Saving...' : 'Save Profile'}
             </Button>
 
+            {/* Settings & Notifications (moved from drawer) */}
+            <div className="mt-8 space-y-4">
+              <h2 className="font-semibold text-lg">Settings</h2>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  {darkMode ? <Key className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                  <Label htmlFor="dark-mode">Dark Mode</Label>
+                </div>
+                <input
+                  id="dark-mode"
+                  type="checkbox"
+                  checked={darkMode}
+                  onChange={e => handleDarkModeChange(e.target.checked)}
+                  title="Toggle dark mode"
+                  aria-label="Toggle dark mode"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Bell className="h-4 w-4" />
+                  <Label htmlFor="notifications">Notifications</Label>
+                </div>
+                <input
+                  id="notifications"
+                  type="checkbox"
+                  checked={notifications}
+                  onChange={e => handleNotificationsChange(e.target.checked)}
+                  title="Toggle notifications"
+                  aria-label="Toggle notifications"
+                />
+              </div>
+            </div>
+
+            {/* Logout (moved from drawer) */}
+            <div className="mt-8">
+              <Button 
+                variant="destructive" 
+                className="w-full justify-start"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <LogOut className="h-4 w-4 mr-3" />
+                Logout
+              </Button>
+              <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Are you sure you want to logout?</DialogTitle>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                      No
+                    </Button>
+                    <Button variant="destructive" onClick={() => {/* add your logout logic here */}}>
+                      Yes
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
             {/* Communication Preferences */}
             <div className="mt-8 space-y-2">
               <h2 className="font-semibold text-lg">Communication Preferences</h2>
@@ -530,7 +620,6 @@ const UpdateProfile = () => {
               <div className="flex gap-4">
                 <Button variant="outline" onClick={handleDownloadData} className="flex items-center gap-2"><Download className="h-4 w-4" /> Download My Data</Button>
                 <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleteLoading} className="flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete My Account</Button>
-                <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)} disabled={deleteLoading} className="flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete My Account</Button>
                 <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
                   <DialogContent>
                     <DialogHeader>
@@ -626,5 +715,3 @@ const UpdateProfile = () => {
     </div>
   );
 };
-
-export default UpdateProfile;

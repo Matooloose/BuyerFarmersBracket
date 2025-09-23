@@ -17,6 +17,7 @@ import { Separator } from "../components/ui/separator"; // Adjust the path as ne
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { useCart } from "../contexts/CartContext";
+import BottomNav from "@/components/BottomNav";
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -266,23 +267,8 @@ const Cart = () => {
         </div>
       )}
 
-      {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-strong">
-        <div className="flex items-center justify-around py-2">
-          {bottomNavItems.map((item) => (
-            <Button
-              key={item.path}
-              variant="ghost"
-              size="sm"
-              className={`flex flex-col items-center px-3 py-2 h-auto ${item.active ? 'text-primary' : ''}`}
-              onClick={() => navigate(item.path)}
-            >
-              <item.icon className="h-5 w-5 mb-1" />
-              <span className="text-xs">{item.label}</span>
-            </Button>
-          ))}
-        </div>
-      </nav>
+      {/* Shared Bottom Navigation */}
+      <BottomNav />
     </div>
   );
 };
