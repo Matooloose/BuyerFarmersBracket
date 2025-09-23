@@ -23,6 +23,7 @@ import UpdateProfile from "./pages/UpdateProfile";
 import Subscriptions from "./pages/Subscriptions";
 import Messages from "./pages/Messages";
 import NotFound from "./pages/NotFound";
+import FarmerProfile from "./pages/FarmerProfile";
 
 const queryClient = new QueryClient();
 
@@ -49,6 +50,7 @@ const App = () => (
               <Route path="/update-profile" element={<UpdateProfile />} />
               <Route path="/subscriptions" element={<Subscriptions />} />
               <Route path="/messages" element={<Messages />} />
+              <Route path="/farmer/:id" element={<FarmerProfile />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -94,7 +94,7 @@ const FarmerProfile = () => {
                 className="farm-map-iframe rounded-lg border w-full h-72"
                 loading="lazy"
                 allowFullScreen
-                src={`https://www.google.com/maps?q=${encodeURIComponent(profile.address)}&output=embed`}
+                src={`https://www.google.com/maps?q=${encodeURIComponent(profile.address)}&key=${import.meta.env.REACT_APP_GOOGLE_PLACES_API_KEY}&output=embed`}
                 title={profile.full_name}
               />
             </div>

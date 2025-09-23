@@ -430,7 +430,7 @@ const UpdateProfile = () => {
                 <Label htmlFor="name" className="text-foreground">Full Name</Label>
                 <Input
                   id="name"
-                  value={profileData.name}
+                  value={profileData.name ?? ""}
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   placeholder="Enter your full name"
                 />
@@ -441,7 +441,7 @@ const UpdateProfile = () => {
                 <Input
                   id="email"
                   type="email"
-                  value={profileData.email}
+                  value={profileData.email ?? ""}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="Enter your email"
                 />
@@ -451,7 +451,7 @@ const UpdateProfile = () => {
                 <Label htmlFor="phone" className="text-foreground">Phone Number</Label>
                 <Input
                   id="phone"
-                  value={profileData.phone}
+                  value={profileData.phone ?? ""}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
                   placeholder="Enter your phone number"
                 />
@@ -461,7 +461,7 @@ const UpdateProfile = () => {
                 <Label htmlFor="location" className="text-foreground">Location</Label>
                 <Input
                   id="location"
-                  value={profileData.location}
+                  value={profileData.location ?? ""}
                   onChange={(e) => handleInputChange('location', e.target.value)}
                   placeholder="Enter your city/area"
                 />
@@ -471,7 +471,7 @@ const UpdateProfile = () => {
                 <Label htmlFor="address" className="text-foreground">Full Address</Label>
                 <Textarea
                   id="address"
-                  value={profileData.address}
+                  value={profileData.address ?? ""}
                   onChange={(e) => handleInputChange('address', e.target.value)}
                   placeholder="Enter your complete address for deliveries"
                   rows={3}

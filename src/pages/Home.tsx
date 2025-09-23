@@ -1,24 +1,13 @@
+import { useToast } from "@/hooks/use-toast";
+import { useCart } from "@/contexts/CartContext";
+import { supabase } from "../integrations/supabase/client";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Search, 
-  MapPin, 
-  Star, 
-  Plus,
-  Home as HomeIcon,
-  ShoppingCart,
-  Package,
-  MessageCircle,
-  Filter
-} from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { useCart } from "@/contexts/CartContext";
-
+import { Search, MapPin, Star, Plus, Home as HomeIcon, ShoppingCart, Package, MessageCircle, Filter, Leaf } from "lucide-react";
 import { NotificationIcon } from "@/components/NotificationIcon";
 
 interface Product {
@@ -42,6 +31,7 @@ interface Farm {
   description: string;
   image_url: string;
   farmer_id: string;
+  // Removed address property
 }
 
 const Home = () => {
@@ -62,7 +52,7 @@ const Home = () => {
       // Fetch products
       const { data: productsData, error: productsError } = await supabase
         .from('products')
-        .select('*')
+        .select('id, name, description, price, unit, category, images, is_organic, is_featured, farmer_id, quantity')
         .gt('quantity', 0)
         .order('created_at', { ascending: false });
 
@@ -71,7 +61,7 @@ const Home = () => {
       // Fetch farms
       const { data: farmsData, error: farmsError } = await supabase
         .from('farms')
-        .select('*')
+        .select('id, name, location, description, image_url, farmer_id')
         .order('created_at', { ascending: false });
 
       if (farmsError) throw farmsError;
@@ -185,25 +175,34 @@ const Home = () => {
             {farms.length > 0 && (
               <section className="space-y-4">
                 <h2 className="text-xl font-semibold text-foreground">Featured Farms</h2>
-                <div className="grid grid-cols-1 gap-4">
+                <div className="flex gap-4 overflow-x-auto pb-2">
                   {farms.slice(0, 3).map((farm) => (
-                    <Card key={farm.id} className="overflow-hidden">
-                      <div className="flex">
-                        <div className="w-24 h-24 bg-gradient-to-br from-primary/10 to-primary/20 flex items-center justify-center">
-                          <MapPin className="h-6 w-6 text-primary" />
-                        </div>
-                        <div className="flex-1 p-4">
-                          <h3 className="font-semibold text-foreground">{farm.name}</h3>
-                          <p className="text-sm text-muted-foreground flex items-center">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            {farm.location}
-                          </p>
-                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-                            {farm.description}
-                          </p>
-                        </div>
+                    <div
+                      key={farm.id}
+                      className="inline-block min-w-[240px] max-w-xs bg-card border rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer align-top farm-scroll-card"
+                      onClick={() => navigate(`/farmer/${farm.farmer_id}`)}
+                    >
+                      <div className="w-full h-28 bg-primary/10 rounded-t-lg flex items-center justify-center overflow-hidden">
+                        {farm.image_url ? (
+                          <img
+                            src={farm.image_url}
+                            alt={farm.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+
+                          <Leaf className="h-10 w-10 text-primary" />
+                        )}
                       </div>
-                    </Card>
+                      <div className="p-4">
+                        <h4 className="font-semibold text-lg text-foreground truncate mb-1">{farm.name}</h4>
+                        {/* Removed address display */}
+                        {farm.location ? (
+                          <p className="text-xs text-muted-foreground mb-1"><span className="font-medium">Location:</span> {farm.location}</p>
+                        ) : null}
+                        <p className="text-sm text-muted-foreground line-clamp-2">{farm.description || "No bio available."}</p>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </section>
