@@ -12,7 +12,7 @@ interface Notification {
   id: string;
   title: string;
   message: string;
-  type: 'order' | 'farmer' | 'admin';
+  type: 'order' | 'farmer';
   read: boolean;
   timestamp: Date;
 }
@@ -71,7 +71,7 @@ interface AppStateProviderProps {
         id: '1',
         title: 'Welcome!',
         message: 'Welcome to Fresh Market. Start exploring fresh products from local farms.',
-        type: 'admin' as const,
+        type: 'order' as const,
         read: false,
         timestamp: new Date()
       }

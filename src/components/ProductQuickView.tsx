@@ -1,9 +1,11 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Package, Plus, Minus, Heart, MapPin, Star } from "lucide-react";
+import { Package, Plus, Minus, Heart, MapPin, Star, MessageSquare } from "lucide-react";
+import { ProductRating } from "@/components/ProductRating";
 
 interface Product {
   id: string;
@@ -41,6 +43,7 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({
   farmName = "Local Farm"
 }) => {
   const [selectedQuantity, setSelectedQuantity] = React.useState(1);
+  const navigate = useNavigate();
 
   if (!product) return null;
 
@@ -127,17 +130,22 @@ const ProductQuickView: React.FC<ProductQuickViewProps> = ({
             <p className="text-sm text-muted-foreground">{product.description || 'No description available'}</p>
           </div>
 
-          {/* Quality Rating (Mock) */}
-          <div className="flex items-center gap-2">
-            <div className="flex items-center">
-              {Array.from({ length: 5 }).map((_, i) => (
-                <Star 
-                  key={i} 
-                  className={`h-4 w-4 ${i < 4 ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
-                />
-              ))}
-            </div>
-            <span className="text-sm text-muted-foreground">(4.0) · 23 reviews</span>
+          {/* Product Rating */}
+          <div className="space-y-3">
+            <h4 className="font-semibold">Customer Reviews</h4>
+            <ProductRating productId={product.id} compact={false} showReviews={false} />
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                onClose();
+                navigate(`/product/${product.id}/reviews`);
+              }}
+              className="w-full"
+            >
+              <MessageSquare className="h-4 w-4 mr-2" />
+              View All Reviews
+            </Button>
           </div>
 
           <Separator />

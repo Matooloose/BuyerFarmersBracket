@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
@@ -16,6 +16,8 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import {
   Menu,
   Home,
@@ -40,7 +42,19 @@ import {
   Loader2,
   Filter,
   Heart,
-  BarChart3
+  Star,
+  TrendingUp,
+  Sparkles,
+  Clock,
+  ArrowRight,
+  Zap,
+  X,
+  Calendar,
+  Target,
+  Award,
+  ThumbsUp,
+  MoreHorizontal,
+  RefreshCw
 } from "lucide-react";
 import { NotificationIcon } from "@/components/NotificationIcon";
 import AvailableFarms from "@/components/AvailableFarms";
@@ -49,6 +63,7 @@ import { ProductCardSkeleton, ProductListSkeleton, QuickActionSkeleton } from "@
 import ProductQuickView from "@/components/ProductQuickView";
 import AdvancedFilters, { FilterOptions } from "@/components/AdvancedFilters";
 import PullToRefreshIndicator from "@/components/PullToRefreshIndicator";
+import { ProductRating } from "@/components/ProductRating";
 
 interface Product {
 id: string;
@@ -62,6 +77,7 @@ is_organic: boolean;
 is_featured: boolean;
 farmer_id: string;
 quantity: number;
+rating?: number;
 }
 
 interface RecentOrder {
@@ -71,6 +87,40 @@ interface RecentOrder {
   total: number;
   createdAt: string;
   itemCount: number;
+}
+
+interface Farm {
+  farmer_id: string;
+  name: string;
+  description: string | null;
+  location: string | null;
+  specialties: string[];
+  rating: number;
+  total_orders: number;
+  distance?: number;
+  reason?: string;
+}
+
+interface RecommendedProduct extends Product {
+  reason: string;
+  confidence: number;
+}
+
+interface UserActivity {
+  recently_viewed: Product[];
+  purchase_history: Product[];
+  wishlist_items: Product[];
+  preferred_categories: string[];
+  location: { latitude: number; longitude: number } | null;
+}
+
+interface QuickAction {
+  id: string;
+  label: string;
+  icon: React.ReactNode;
+  action: () => void;
+  primary?: boolean;
+  disabled?: boolean;
 }
 
 const Dashboard: React.FC = () => {
@@ -85,10 +135,22 @@ const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
 const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 const [isGridView, setIsGridView] = useState(true);
+const [showFAB, setShowFAB] = useState(false);
+const [fabExpanded, setFabExpanded] = useState(false);
 
 // Data State
 const [products, setProducts] = useState<Product[]>([]);
 const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+const [recommendedProducts, setRecommendedProducts] = useState<RecommendedProduct[]>([]);
+const [recentlyViewedProducts, setRecentlyViewedProducts] = useState<Product[]>([]);
+const [personalizedFarms, setPersonalizedFarms] = useState<Farm[]>([]);
+const [userActivity, setUserActivity] = useState<UserActivity>({
+  recently_viewed: [],
+  purchase_history: [],
+  wishlist_items: [],
+  preferred_categories: [],
+  location: null
+});
 const [loading, setLoading] = useState(true);
 const [searchTerm, setSearchTerm] = useState("");
 const [addingToCart, setAddingToCart] = useState<string | null>(null);
@@ -108,6 +170,9 @@ const [filtersOpen, setFiltersOpen] = useState(false);
 // Settings State
 const [darkMode, setDarkMode] = useState(() => localStorage.getItem('theme') === 'dark');
 const [notifications, setNotifications] = useState(() => localStorage.getItem('notifications') !== 'false');
+
+// Refs
+const scrollRef = useRef<HTMLDivElement>(null);
 
 // Debounced search term
 const debouncedSearchTerm = useDebounce(searchTerm, 300);
@@ -227,6 +292,11 @@ useEffect(() => {
     try {
       await fetchProducts();
       await fetchRecentOrders();
+      if (user) {
+        await loadUserActivity();
+        fetchRecentlyViewed();
+        await fetchPersonalizedFarms();
+      }
     } catch (error) {
       // Retry logic - attempt up to 2 retries
       if (retryCount < 2) {
@@ -244,13 +314,16 @@ useEffect(() => {
     }
   };
   fetchData();
-}, [toast, filters]);
+}, [toast, filters, user]);
 
 // Pull to refresh
 const handleRefresh = async () => {
   try {
     await fetchProducts();
     await fetchRecentOrders();
+    await fetchRecommendations();
+    await fetchRecentlyViewed();
+    await fetchPersonalizedFarms();
     toast({
       title: "Refreshed",
       description: "Data updated successfully",
@@ -268,6 +341,257 @@ const pullToRefresh = usePullToRefresh({
   onRefresh: handleRefresh,
   threshold: 80
 });
+
+// Scroll detection for FAB
+useEffect(() => {
+  const handleScroll = () => {
+    const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    setShowFAB(scrollTop > 200);
+  };
+
+  window.addEventListener('scroll', handleScroll);
+  return () => window.removeEventListener('scroll', handleScroll);
+}, []);
+
+// Load user activity on mount
+useEffect(() => {
+  loadUserActivity();
+}, [user]);
+
+// Smart recommendation system
+const generateRecommendations = useCallback(async (activity: UserActivity): Promise<RecommendedProduct[]> => {
+  if (!activity.purchase_history?.length && !activity.recently_viewed?.length) {
+    // New user - show popular products
+    const popularProducts = products
+      .filter(p => p.rating && p.rating >= 4.0)
+      .slice(0, 6)
+      .map(p => ({
+        ...p,
+        reason: "Popular choice",
+        confidence: 0.8
+      }));
+    return popularProducts;
+  }
+
+  const recommendations: RecommendedProduct[] = [];
+  const seenIds = new Set<string>();
+
+  // Recommendation based on purchase history
+  if (activity.purchase_history?.length) {
+    const purchasedCategories = [...new Set(activity.purchase_history.map(p => p.category))];
+    
+    for (const category of purchasedCategories) {
+      const categoryProducts = products
+        .filter(p => p.category === category && !seenIds.has(p.id))
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        .slice(0, 2);
+
+      categoryProducts.forEach(p => {
+        recommendations.push({
+          ...p,
+          reason: `More ${category.toLowerCase()} products`,
+          confidence: 0.9
+        });
+        seenIds.add(p.id);
+      });
+    }
+  }
+
+  // Recommendation based on recently viewed
+  if (activity.recently_viewed?.length) {
+    const viewedCategories = [...new Set(activity.recently_viewed.map(p => p.category))];
+    
+    for (const category of viewedCategories) {
+      const similarProducts = products
+        .filter(p => p.category === category && !seenIds.has(p.id))
+        .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+        .slice(0, 1);
+
+      similarProducts.forEach(p => {
+        recommendations.push({
+          ...p,
+          reason: "Similar to recently viewed",
+          confidence: 0.7
+        });
+        seenIds.add(p.id);
+      });
+    }
+  }
+
+  // Location-based recommendations
+  if (activity.location) {
+    const nearbyProducts = products
+      .filter(p => !seenIds.has(p.id))
+      .slice(0, 2);
+
+    nearbyProducts.forEach(p => {
+      recommendations.push({
+        ...p,
+        reason: "Popular in your area",
+        confidence: 0.6
+      });
+      seenIds.add(p.id);
+    });
+  }
+
+  // Fill remaining slots with trending products
+  const trending = products
+    .filter(p => !seenIds.has(p.id) && p.rating && p.rating >= 4.0)
+    .sort(() => Math.random() - 0.5)
+    .slice(0, Math.max(0, 8 - recommendations.length));
+
+  trending.forEach(p => {
+    recommendations.push({
+      ...p,
+      reason: "Trending now",
+      confidence: 0.5
+    });
+  });
+
+  return recommendations.slice(0, 8);
+}, [products]);
+
+// Load user activity from various sources
+const loadUserActivity = useCallback(async () => {
+  if (!user) return;
+
+  try {
+    const activity: UserActivity = {
+      recently_viewed: JSON.parse(localStorage.getItem(`recently_viewed_${user.id}`) || '[]'),
+      purchase_history: [],
+      wishlist_items: [],
+      preferred_categories: [],
+      location: null
+    };
+
+    // Get purchase history from orders
+    const { data: orders } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (
+          quantity,
+          price,
+          products (*)
+        )
+      `)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (orders) {
+      activity.purchase_history = orders.flatMap(order => 
+        order.order_items?.map((item: any) => item.products) || []
+      ).filter(Boolean);
+    }
+
+    // Get wishlist items - using a different approach since wishlist table doesn't exist
+    // For now, we'll get this from local storage or context
+    const wishlistFromContext = []; // This would come from WishlistContext
+    activity.wishlist_items = wishlistFromContext;
+
+    // Calculate preferred categories
+    const allProducts = [...activity.purchase_history, ...activity.wishlist_items];
+    const categoryCount = allProducts.reduce((acc, product) => {
+      acc[product.category] = (acc[product.category] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    activity.preferred_categories = Object.entries(categoryCount)
+      .sort(([,a], [,b]) => b - a)
+      .slice(0, 3)
+      .map(([category]) => category);
+
+    // Get user location if available
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          activity.location = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          };
+          setUserActivity(prev => ({ ...prev, location: activity.location }));
+        },
+        () => {} // Ignore location errors
+      );
+    }
+
+    setUserActivity(activity);
+    
+    // Generate recommendations based on activity
+    const recommendations = await generateRecommendations(activity);
+    setRecommendedProducts(recommendations);
+
+  } catch (error) {
+    console.error('Error loading user activity:', error);
+  }
+}, [user, generateRecommendations]);
+
+// Track product view
+const trackProductView = useCallback((product: Product) => {
+  if (!user) return;
+
+  const storageKey = `recently_viewed_${user.id}`;
+  const recentlyViewed = JSON.parse(localStorage.getItem(storageKey) || '[]');
+  
+  // Remove if already exists and add to front
+  const filtered = recentlyViewed.filter((p: Product) => p.id !== product.id);
+  const updated = [product, ...filtered].slice(0, 10); // Keep last 10
+  
+  localStorage.setItem(storageKey, JSON.stringify(updated));
+  setUserActivity(prev => ({ ...prev, recently_viewed: updated }));
+}, [user]);
+
+// Fetch functions
+const fetchRecommendations = useCallback(async () => {
+  const recommendations = await generateRecommendations(userActivity);
+  setRecommendedProducts(recommendations);
+}, [userActivity, generateRecommendations]);
+
+const fetchRecentlyViewed = useCallback(() => {
+  if (!user) return;
+  
+  const storageKey = `recently_viewed_${user.id}`;
+  const recentlyViewed = JSON.parse(localStorage.getItem(storageKey) || '[]');
+  setRecentlyViewedProducts(recentlyViewed.slice(0, 6));
+}, [user]);
+
+const fetchPersonalizedFarms = useCallback(async () => {
+  if (!user) return;
+
+  try {
+    let query = supabase
+      .from('farms')
+      .select('*')
+      .limit(4);
+
+    // If user has location, prioritize nearby farms
+    if (userActivity.location) {
+      // In a real app, you'd use PostGIS for distance calculations
+      // For now, we'll just get random farms
+      query = query.order('created_at', { ascending: false });
+    } else {
+      // Show popular farms
+      query = query.order('rating', { ascending: false });
+    }
+
+    const { data: farms } = await query;
+    
+    if (farms) {
+      setPersonalizedFarms(farms.map(farm => ({
+        farmer_id: farm.farmer_id,
+        name: farm.name,
+        description: farm.description,
+        location: farm.location,
+        specialties: [], // Default empty array
+        rating: 0, // Default rating
+        total_orders: 0, // Default orders
+        reason: userActivity.location ? "Near your location" : "Highly rated"
+      })));
+    }
+  } catch (error) {
+    console.error('Error fetching personalized farms:', error);
+  }
+}, [user, userActivity.location]);
 
 // Fetch products when search term or filters change
 useEffect(() => {
@@ -374,7 +698,47 @@ const handleWishlistToggle = (productId: string) => {
 };
 
 const handleQuickView = (product: Product) => {
-  setQuickViewProduct(product);
+  navigate(`/product/${product.id}`);
+};
+
+// Helper function to convert Product to WishlistItem
+const productToWishlistItem = (product: Product): Omit<any, "addedAt"> => ({
+  id: product.id,
+  name: product.name,
+  price: product.price,
+  unit: product.unit,
+  image: product.images?.[0] || "/placeholder.svg",
+  farmName: farmNames[product.farmer_id] || "Local Farm",
+  category: product.category
+});
+
+// Add to cart handler
+const handleAddToCart = async (product: Product | RecommendedProduct) => {
+  setAddingToCart(product.id);
+  try {
+    addToCart({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      unit: product.unit,
+      image: product.images?.[0] || "/placeholder.svg",
+      farmName: farmNames[product.farmer_id] || "Local Farm",
+      category: product.category
+    });
+    
+    toast({
+      title: "Added to cart",
+      description: `${product.name} has been added to your cart`,
+    });
+  } catch (error) {
+    toast({
+      title: "Error",
+      description: "Failed to add item to cart",
+      variant: "destructive",
+    });
+  } finally {
+    setAddingToCart(null);
+  }
 };
 
 // Get unique categories and price range for filters
@@ -382,6 +746,44 @@ const availableCategories = Array.from(new Set(products.map(p => p.category)));
 const priceRange: [number, number] = products.length > 0 
   ? [Math.min(...products.map(p => p.price)), Math.max(...products.map(p => p.price))]
   : [0, 1000];
+
+// Quick Actions for FAB
+const quickActions: QuickAction[] = [
+  {
+    id: 'search',
+    label: 'Search Products',
+    icon: <Search className="h-4 w-4" />,
+    action: () => {
+      const searchInput = document.querySelector('input[placeholder="Search products..."]') as HTMLInputElement;
+      searchInput?.focus();
+    },
+    primary: true
+  },
+  {
+    id: 'cart',
+    label: 'View Cart',
+    icon: <ShoppingCart className="h-4 w-4" />,
+    action: () => navigate('/cart')
+  },
+  {
+    id: 'orders',
+    label: 'Order History',
+    icon: <Calendar className="h-4 w-4" />,
+    action: () => navigate('/order-history')
+  },
+  {
+    id: 'wishlist',
+    label: 'Wishlist',
+    icon: <Heart className="h-4 w-4" />,
+    action: () => navigate('/wishlist')
+  },
+  {
+    id: 'refresh',
+    label: 'Refresh',
+    icon: <RefreshCw className="h-4 w-4" />,
+    action: handleRefresh
+  }
+];
 
 // Enhanced filtering with memoization
 const filteredProducts = useMemo(() => {
@@ -615,6 +1017,174 @@ return (
               </CardDescription>
             </CardHeader>
           </Card>
+
+          {/* Smart Recommendations Section */}
+          {recommendedProducts.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-semibold text-foreground">Just for You</h2>
+              </div>
+              <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+                <div className="flex w-max space-x-4 p-4">
+                  {recommendedProducts.map((product) => (
+                    <Card 
+                      key={product.id} 
+                      className="w-[280px] cursor-pointer hover:shadow-lg transition-shadow"
+                      onClick={() => navigate(`/product/${product.id}`)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="aspect-square relative mb-3 overflow-hidden rounded-lg">
+                          <img
+                            src={product.images?.[0] || "/placeholder.svg"}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute top-2 right-2">
+                            <Button
+                              size="sm"
+                              variant={isInWishlist(product.id) ? "default" : "secondary"}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isInWishlist(product.id)) {
+                                  removeFromWishlist(product.id);
+                                } else {
+                                  addToWishlist(productToWishlistItem(product));
+                                }
+                              }}
+                              className="h-8 w-8 p-0"
+                            >
+                              <Heart className={`h-4 w-4 ${isInWishlist(product.id) ? 'fill-current' : ''}`} />
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center space-x-2">
+                            <Star className="h-4 w-4 text-yellow-500 fill-current" />
+                            <span className="text-sm text-muted-foreground">{product.reason}</span>
+                          </div>
+                          <h3 className="font-semibold line-clamp-1">{product.name}</h3>
+                          <div className="flex items-center justify-between">
+                            <span className="text-lg font-bold text-primary">R{product.price.toFixed(2)}</span>
+                            <span className="text-sm text-muted-foreground">per {product.unit}</span>
+                          </div>
+                          <Progress value={product.confidence * 100} className="h-1" />
+                          <Button
+                            size="sm"
+                            className="w-full"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddToCart(product);
+                              trackProductView(product);
+                            }}
+                            disabled={addingToCart === product.id}
+                          >
+                            {addingToCart === product.id ? (
+                              <div className="flex items-center space-x-2">
+                                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                <span>Adding...</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center space-x-2">
+                                <ShoppingCart className="h-4 w-4" />
+                                <span>Add to Cart</span>
+                              </div>
+                            )}
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </section>
+          )}
+
+          {/* Recently Viewed Section */}
+          {recentlyViewedProducts.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Clock className="h-5 w-5 text-muted-foreground" />
+                <h2 className="text-xl font-semibold text-foreground">Recently Viewed</h2>
+              </div>
+              <ScrollArea className="w-full whitespace-nowrap rounded-md border">
+                <div className="flex w-max space-x-4 p-4">
+                  {recentlyViewedProducts.map((product) => (
+                    <Card 
+                      key={`recent-${product.id}`} 
+                      className="w-[200px] cursor-pointer hover:shadow-lg transition-shadow"
+                      onClick={() => navigate(`/product/${product.id}`)}
+                    >
+                      <CardContent className="p-3">
+                        <div className="aspect-square relative mb-2 overflow-hidden rounded-lg">
+                          <img
+                            src={product.images?.[0] || "/placeholder.svg"}
+                            alt={product.name}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+                        <h3 className="font-medium line-clamp-1 text-sm">{product.name}</h3>
+                        <div className="flex items-center justify-between mt-1">
+                          <span className="text-sm font-bold text-primary">R{product.price.toFixed(2)}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddToCart(product);
+                            }}
+                            className="h-6 w-6 p-0"
+                          >
+                            <Plus className="h-3 w-3" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+                <ScrollBar orientation="horizontal" />
+              </ScrollArea>
+            </section>
+          )}
+
+          {/* Personalized Farms Section */}
+          {personalizedFarms.length > 0 && (
+            <section className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <TrendingUp className="h-5 w-5 text-green-600" />
+                <h2 className="text-xl font-semibold text-foreground">Recommended Farms</h2>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {personalizedFarms.map((farm) => (
+                  <Card 
+                    key={farm.farmer_id} 
+                    className="cursor-pointer hover:shadow-lg transition-shadow"
+                    onClick={() => navigate(`/farmer/${farm.farmer_id}`)}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex items-start space-x-3">
+                        <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+                          <Leaf className="h-6 w-6 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold line-clamp-1">{farm.name}</h3>
+                          <p className="text-sm text-muted-foreground line-clamp-2">{farm.description || "Fresh local produce"}</p>
+                          <div className="flex items-center space-x-4 mt-2">
+                            <div className="flex items-center space-x-1">
+                              <MapPin className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-xs text-muted-foreground">{farm.location || "Local area"}</span>
+                            </div>
+                            <span className="text-xs text-primary font-medium">{farm.reason}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </section>
+          )}
           
           {/* Recent Orders */}
           {recentOrders.length > 0 && (
@@ -779,6 +1349,10 @@ return (
                             </Button>
                           </div>
                         </div>
+                        {/* Product Rating */}
+                        <div className="mt-2">
+                          <ProductRating productId={product.id} compact={true} showReviews={false} />
+                        </div>
                       </div>
                     </CardContent>
                   </Card>
@@ -829,6 +1403,10 @@ return (
                                 {product.is_organic && (
                                   <Badge variant="secondary" className="text-xs">Organic</Badge>
                                 )}
+                              </div>
+                              {/* Product Rating for List View */}
+                              <div className="mt-2">
+                                <ProductRating productId={product.id} compact={true} showReviews={false} />
                               </div>
                             </div>
                             <div className="flex items-center gap-1 flex-shrink-0">
@@ -902,13 +1480,6 @@ return (
                 <CardContent className="p-3 text-center">
                   <Package className="h-6 w-6 mx-auto mb-2 text-primary" />
                   <p className="font-medium text-xs">Order History</p>
-                </CardContent>
-              </Card>
-              <Card className="cursor-pointer hover:shadow-medium transition-shadow"
-                onClick={() => handleNavigation('/reports')}>
-                <CardContent className="p-3 text-center">
-                  <BarChart3 className="h-6 w-6 mx-auto mb-2 text-primary" />
-                  <p className="font-medium text-xs">Reports</p>
                 </CardContent>
               </Card>
               <Card className="cursor-pointer hover:shadow-medium transition-shadow"
@@ -1002,6 +1573,63 @@ return (
         isAddingToCart={addingToCart === quickViewProduct.id}
         farmName={farmNames[quickViewProduct.farmer_id]}
       />
+    )}
+
+    {/* Floating Action Button */}
+    {showFAB && (
+      <div className="fixed bottom-20 right-4 z-50">
+        <div className="relative">
+          {/* FAB Menu */}
+          {fabExpanded && (
+            <div className="absolute bottom-16 right-0 flex flex-col-reverse space-y-reverse space-y-3 mb-2">
+              {quickActions.filter(action => !action.primary).map((action) => (
+                <div key={action.id} className="flex items-center space-x-3">
+                  <span className="text-sm font-medium text-foreground bg-card px-3 py-1 rounded-full shadow-lg border">
+                    {action.label}
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => {
+                      action.action();
+                      setFabExpanded(false);
+                    }}
+                    className="h-10 w-10 rounded-full shadow-lg"
+                  >
+                    {action.icon}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Main FAB Button */}
+          <Button
+            size="lg"
+            className="h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 transition-all duration-200"
+            onClick={() => setFabExpanded(!fabExpanded)}
+          >
+            <div className={`transition-transform duration-200 ${fabExpanded ? 'rotate-45' : 'rotate-0'}`}>
+              {fabExpanded ? <X className="h-6 w-6" /> : <Zap className="h-6 w-6" />}
+            </div>
+          </Button>
+
+          {/* Primary Action Button */}
+          {!fabExpanded && quickActions.find(action => action.primary) && (
+            <Button
+              size="sm"
+              variant="secondary"
+              onClick={() => quickActions.find(action => action.primary)?.action()}
+              className="absolute -top-12 left-1/2 transform -translate-x-1/2 h-8 px-3 rounded-full shadow-lg"
+            >
+              <div className="flex items-center space-x-1">
+                {quickActions.find(action => action.primary)?.icon}
+                <span className="text-xs">Quick Search</span>
+              </div>
+            </Button>
+          )}
+        </div>
+      </div>
     )}
   </div>
   </ErrorBoundary>

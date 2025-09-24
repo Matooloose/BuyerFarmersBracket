@@ -18,21 +18,22 @@ const Dashboard = React.lazy(() => import("./pages/Dashboard"));
 const Cart = React.lazy(() => import("./pages/Cart"));
 const TrackOrder = React.lazy(() => import("./pages/TrackOrder"));
 const BrowseProducts = React.lazy(() => import("./pages/BrowseProducts"));
+const ProductDetail = React.lazy(() => import("./pages/ProductDetail"));
 const Checkout = React.lazy(() => import("./pages/Checkout"));
 const UpdateProfile = React.lazy(() => import("./pages/UpdateProfile"));
 const Subscriptions = React.lazy(() => import("./pages/Subscriptions"));
 const Messages = React.lazy(() => import("./pages/Messages"));
 const NotFound = React.lazy(() => import("./pages/NotFound"));
-const FarmerProfile = React.lazy(() => import("./pages/FarmerProfile"));
 const HowItWorks = React.lazy(() => import("./pages/HowItWorks"));
 const ContactSupport = React.lazy(() => import("./pages/ContactSupport"));
+const CustomerSupport = React.lazy(() => import("./pages/CustomerSupport"));
 const Wishlist = React.lazy(() => import("./pages/Wishlist"));
 const OrderHistory = React.lazy(() => import("./pages/OrderHistory"));
 const FAQ = React.lazy(() => import("./pages/FAQ"));
 const PaymentSuccess = React.lazy(() => import("./pages/PaymentSuccess"));
 const PaymentCancelled = React.lazy(() => import("./pages/PaymentCancelled"));
-const Reports = React.lazy(() => import("./pages/Reports"));
 const PayFastTest = React.lazy(() => import("./pages/PayFastTest"));
+const ProductReviews = React.lazy(() => import("./pages/ProductReviews"));
 
 const queryClient = new QueryClient();
 
@@ -68,7 +69,9 @@ const App = () => (
                     <Route path="/home" element={<Dashboard />} />
                     <Route path="/cart" element={<Cart />} />
                     <Route path="/track-order" element={<TrackOrder />} />
+                    <Route path="/track-order/:orderId" element={<TrackOrder />} />
                     <Route path="/browse-products" element={<BrowseProducts />} />
+                    <Route path="/product/:productId" element={<ProductDetail />} />
                     <Route path="/checkout" element={<Checkout />} />
                     <Route path="/profile" element={<UpdateProfile />} />
                     <Route path="/update-profile" element={<UpdateProfile />} />
@@ -76,11 +79,11 @@ const App = () => (
                     <Route path="/messages" element={<Messages />} />
                     <Route path="/wishlist" element={<Wishlist />} />
                     <Route path="/order-history" element={<OrderHistory />} />
-                    <Route path="/farmer/:id" element={<FarmerProfile />} />
                     <Route path="/how-it-works" element={<HowItWorks />} />
                     <Route path="/contact-support" element={<ContactSupport />} />
+                    <Route path="/customer-support" element={<CustomerSupport />} />
                     <Route path="/faq" element={<FAQ />} />
-                    <Route path="/reports" element={<Reports />} />
+                    <Route path="/product/:productId/reviews" element={<ProductReviews />} />
                     <Route path="/payment-success" element={<PaymentSuccess />} />
                     <Route path="/payment-cancelled" element={<PaymentCancelled />} />
                     <Route path="/payfast-test" element={<PayFastTest />} />

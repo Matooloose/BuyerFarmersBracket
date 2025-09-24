@@ -42,7 +42,9 @@ const AdvancedFilters: React.FC<AdvancedFiltersProps> = ({
   };
 
   const handlePriceRangeChange = (value: number[]) => {
-    onFiltersChange({ ...filters, priceRange: [value[0], value[1]] });
+    if (value && value.length === 2) {
+      onFiltersChange({ ...filters, priceRange: [value[0], value[1]] });
+    }
   };
 
   const clearAllFilters = () => {
