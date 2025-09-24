@@ -162,6 +162,12 @@ const Checkout = () => {
     initializeCheckout();
   }, [cartItems.length, navigate]);
 
+  // Debug effect to track payment method selection
+  useEffect(() => {
+    console.log('Selected Payment Method:', selectedPaymentMethod);
+    console.log('Available Payment Methods:', paymentMethods);
+  }, [selectedPaymentMethod, paymentMethods]);
+
   const initializeCheckout = async () => {
     await fetchUserProfile();
     await loadSavedAddresses();
@@ -426,14 +432,23 @@ const Checkout = () => {
 
     if (!formData.phoneNumber.trim()) {
       errors.phoneNumber = 'Phone number is required';
+    } else if (!/^(\+27|0)[6-8][0-9]{8}$/.test(formData.phoneNumber.replace(/\s/g, ''))) {
+      errors.phoneNumber = 'Please enter a valid South African phone number';
     }
 
     if (!formData.address.trim()) {
       errors.address = 'Address is required';
+    } else if (formData.address.trim().length < 10) {
+      errors.address = 'Please provide a more detailed address';
     }
 
     if (!selectedPaymentMethod) {
       errors.payment = 'Please select a payment method';
+    }
+
+    // Check if address validation passed
+    if (!addressValidation.isValid && formData.address.trim()) {
+      errors.address = 'Please check your address format';
     }
 
     setValidationErrors(errors);
@@ -441,6 +456,17 @@ const Checkout = () => {
   };
 
   const handlePlaceOrder = async () => {
+    // Check if cart is empty
+    if (cartItems.length === 0) {
+      toast({
+        title: "Cart is empty",
+        description: "Add some items to your cart first",
+        variant: "destructive",
+      });
+      navigate('/browse-products');
+      return;
+    }
+
     // Validate form
     if (!validateForm()) {
       toast({
@@ -448,6 +474,17 @@ const Checkout = () => {
         description: "Check the highlighted fields and try again",
         variant: "destructive",
       });
+      return;
+    }
+
+    // Check if user is authenticated
+    if (!user?.id) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to place an order",
+        variant: "destructive",
+      });
+      navigate('/login');
       return;
     }
 
@@ -461,17 +498,18 @@ const Checkout = () => {
       });
 
       // Create order in database
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-
       const orderData = {
         user_id: user.id,
         total,
         status: 'pending' as const,
         payment_status: 'pending' as const,
         payment_method: selectedPaymentMethod,
-        shipping_address: formData.address
+        shipping_address: formData.address,
+        delivery_instructions: formData.instructions || null,
+        phone_number: formData.phoneNumber,
+        estimated_delivery: estimatedDelivery,
+        delivery_slot: selectedSlot ? `${selectedSlot.date.toISOString().split('T')[0]} ${selectedSlot.timeSlot}` : null,
+        gift_options: giftOptions.enabled ? JSON.stringify(giftOptions) : null
       };
 
       const { data: order, error: orderError } = await supabase
@@ -480,7 +518,10 @@ const Checkout = () => {
         .select()
         .single();
 
-      if (orderError) throw orderError;
+      if (orderError) {
+        console.error('Order creation error:', orderError);
+        throw new Error('Failed to create order. Please try again.');
+      }
 
       // Create order items
       const orderItems = cartItems.map(item => ({
@@ -494,7 +535,10 @@ const Checkout = () => {
         .from('order_items')
         .insert(orderItems);
 
-      if (itemsError) throw itemsError;
+      if (itemsError) {
+        console.error('Order items error:', itemsError);
+        throw new Error('Failed to add items to order. Please try again.');
+      }
 
       // Handle payment method
       const selectedMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethod);
@@ -1215,29 +1259,61 @@ const Checkout = () => {
           <Switch />
         </div>
 
-        <PaymentMethodDialog
-          amount={total.toFixed(2)}
-          onPaymentMethodSelect={(method) => {
-            setSelectedPaymentMethod(method);
-            handlePlaceOrder();
-          }}
-          trigger={
-            <Button 
-              disabled={isProcessing}
-              className="w-full"
-              size="lg"
-            >
-              {isProcessing ? (
-                <div className="flex items-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Processing...
-                </div>
-              ) : (
-                `Place Order - R${total.toFixed(2)}`
-              )}
-            </Button>
-          }
-        />
+        {/* Debug Info for Development */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded">
+            Debug: Payment Method: {selectedPaymentMethod || 'None'} | 
+            Valid Form: {validateForm() ? 'Yes' : 'No'} | 
+            Cart Items: {cartItems.length}
+          </div>
+        )}
+
+        {/* Quick Checkout Button (for testing) */}
+        <div className="flex gap-2">
+          <Button 
+            onClick={() => {
+              if (!selectedPaymentMethod && paymentMethods.length > 0) {
+                setSelectedPaymentMethod(paymentMethods[0].id);
+              }
+              setTimeout(() => {
+                handlePlaceOrder();
+              }, 100);
+            }}
+            disabled={isProcessing}
+            className="flex-1"
+            size="lg"
+            variant="outline"
+          >
+            Quick Checkout (Test)
+          </Button>
+          
+          <PaymentMethodDialog
+            amount={total.toFixed(2)}
+            onPaymentMethodSelect={(method) => {
+              console.log('Payment method selected:', method);
+              setSelectedPaymentMethod(method);
+              setTimeout(() => {
+                handlePlaceOrder();
+              }, 100);
+            }}
+            trigger={
+              <Button 
+                disabled={isProcessing}
+                className="flex-1"
+                size="lg"
+              >
+                {isProcessing ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Processing...
+                  </div>
+                ) : (
+                  `Place Order - R${total.toFixed(2)}`
+                )}
+              </Button>
+            }
+          />
+        </div>
       </div>
     </div>
   );

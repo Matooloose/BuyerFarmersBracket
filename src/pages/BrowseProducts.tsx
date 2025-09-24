@@ -302,6 +302,140 @@ function BrowseProducts() {
     const avgRating = getAverageRating(product.id);
     const reviewCount = productReviews[product.id]?.length || 0;
     
+    if (viewMode === 'list') {
+      return (
+        <Card 
+          className="group hover:shadow-lg transition-shadow duration-200 cursor-pointer"
+          onClick={() => navigate(`/product/${product.id}`)}
+        >
+          <CardContent className="p-4">
+            <div className="flex gap-4">
+              <div className="relative flex-shrink-0 w-32 h-32">
+                <img 
+                  src={product.images?.[0] || "/placeholder.svg"} 
+                  alt={product.name}
+                  className="w-full h-full object-cover rounded-lg"
+                />
+                
+                {/* Badges */}
+                <div className="absolute top-1 left-1 flex flex-col gap-1">
+                  {product.is_organic && (
+                    <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+                      <Leaf className="h-2 w-2 mr-1" />
+                      Organic
+                    </Badge>
+                  )}
+                  {product.is_featured && (
+                    <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 text-xs">
+                      <Award className="h-2 w-2 mr-1" />
+                      Featured
+                    </Badge>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex-1 space-y-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h3 className="font-semibold text-lg">{product.name}</h3>
+                    <div className="flex items-center text-sm text-gray-600">
+                      <MapPin className="h-3 w-3 mr-1" />
+                      {product.farmName} • {product.farmLocation}
+                    </div>
+                  </div>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="bg-white/90 hover:bg-white"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleWishlistToggle(product);
+                    }}
+                  >
+                    <Heart 
+                      className={`h-4 w-4 ${isInWishlist(product.id) ? 'fill-red-500 text-red-500' : ''}`}
+                    />
+                  </Button>
+                </div>
+
+                {/* Rating */}
+                {reviewCount > 0 && (
+                  <div className="flex items-center gap-1">
+                    <div className="flex">
+                      {[...Array(5)].map((_, i) => (
+                        <Star 
+                          key={i} 
+                          className={`h-4 w-4 ${i < avgRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm text-gray-600">({reviewCount})</span>
+                  </div>
+                )}
+
+                {/* Description */}
+                {product.description && (
+                  <p className="text-sm text-gray-600 line-clamp-2">{product.description}</p>
+                )}
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div>
+                      <span className="text-xl font-bold">R{product.price.toFixed(2)}</span>
+                      <span className="text-sm text-gray-500 ml-1">per {product.unit}</span>
+                    </div>
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Package className="h-3 w-3 mr-1" />
+                      {product.quantity} in stock
+                    </div>
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleAddToCart(product);
+                      }}
+                      disabled={product.quantity === 0}
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      Add to Cart
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setReviewProductId(product.id);
+                        setReviewModalOpen(true);
+                      }}
+                    >
+                      <Star className="h-4 w-4" />
+                    </Button>
+                    
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate(`/product/${product.id}`);
+                      }}
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+    
+    // Grid view (original design)
     return (
       <Card 
         className="group hover:shadow-lg transition-shadow duration-200 cursor-pointer"
