@@ -178,17 +178,28 @@ const Cart = () => {
     try {
       const cartCategories = [...new Set(cartItems.map(item => item.category || 'Other'))];
       const cartFarmers = [...new Set(cartItems.map(item => item.farmName || ''))];
+      const cartItemIds = cartItems.map(item => item.id);
 
       // Get frequently bought together items
-      const { data: suggestions } = await supabase
+      let query = supabase
         .from('products')
         .select('*')
-        .in('category', cartCategories as any)
-        .not('id', 'in', `(${cartItems.map(item => `'${item.id}'`).join(',')})`)
         .limit(6);
 
-      if (suggestions) {
-        const enhancedSuggestions = suggestions.map(product => ({
+      // Only filter by category if we have categories
+      if (cartCategories.length > 0) {
+        query = query.in('category', cartCategories as any);
+      }
+
+      const { data: suggestions } = await query;
+
+      // Filter out cart items on the client side
+      const filteredSuggestions = suggestions?.filter(product => 
+        !cartItemIds.includes(product.id)
+      ) || [];
+
+      if (filteredSuggestions.length > 0) {
+        const enhancedSuggestions = filteredSuggestions.slice(0, 6).map(product => ({
           id: product.id,
           name: product.name,
           price: product.price,

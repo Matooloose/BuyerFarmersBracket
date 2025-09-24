@@ -570,8 +570,8 @@ const fetchPersonalizedFarms = useCallback(async () => {
       // For now, we'll just get random farms
       query = query.order('created_at', { ascending: false });
     } else {
-      // Show popular farms
-      query = query.order('rating', { ascending: false });
+      // Show farms by creation date for now (until rating column is added)
+      query = query.order('created_at', { ascending: false });
     }
 
     const { data: farms } = await query;

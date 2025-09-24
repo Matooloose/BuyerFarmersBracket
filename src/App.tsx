@@ -34,6 +34,7 @@ const PaymentSuccess = React.lazy(() => import("./pages/PaymentSuccess"));
 const PaymentCancelled = React.lazy(() => import("./pages/PaymentCancelled"));
 const PayFastTest = React.lazy(() => import("./pages/PayFastTest"));
 const ProductReviews = React.lazy(() => import("./pages/ProductReviews"));
+const FarmerProfile = React.lazy(() => import("./pages/FarmerProfile"));
 
 const queryClient = new QueryClient();
 
@@ -84,6 +85,7 @@ const App = () => (
                     <Route path="/customer-support" element={<CustomerSupport />} />
                     <Route path="/faq" element={<FAQ />} />
                     <Route path="/product/:productId/reviews" element={<ProductReviews />} />
+                    <Route path="/farmer/:farmerId" element={<FarmerProfile />} />
                     <Route path="/payment-success" element={<PaymentSuccess />} />
                     <Route path="/payment-cancelled" element={<PaymentCancelled />} />
                     <Route path="/payfast-test" element={<PayFastTest />} />
