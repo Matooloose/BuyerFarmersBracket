@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Check, ArrowLeft, MessageCircle, Crown, Calendar, Zap, CreditCard, Settings, Gift, TrendingUp, Users, Clock, AlertTriangle, Pause, Play } from "lucide-react";
+import { Check, ArrowLeft, MessageCircle, Crown, Calendar, Zap, CreditCard, Settings, TrendingUp, Users, Clock, AlertTriangle, Pause, Play } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { format, addDays, addMonths, differenceInDays } from "date-fns";
 

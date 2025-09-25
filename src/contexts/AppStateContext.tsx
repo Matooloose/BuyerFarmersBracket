@@ -63,19 +63,36 @@ interface AppStateProviderProps {
 
   const [notifications, setNotifications] = useState<Notification[]>(() => {
     const saved = localStorage.getItem(`notifications_${userId}`);
-    return saved ? JSON.parse(saved).map((n: Omit<Notification, 'timestamp'> & { timestamp: string }) => ({
-      ...n,
-      timestamp: new Date(n.timestamp)
-    })) : [
-      {
-        id: '1',
-        title: 'Welcome!',
-        message: 'Welcome to Fresh Market. Start exploring fresh products from local farms.',
-        type: 'order' as const,
-        read: false,
-        timestamp: new Date()
+    let loaded: Notification[] = saved
+      ? JSON.parse(saved).map((n: Omit<Notification, 'timestamp'> & { timestamp: string }) => ({
+          ...n,
+          timestamp: new Date(n.timestamp)
+        }))
+      : [];
+
+    // Check if welcome notification has been seen
+    const hasSeenWelcome = localStorage.getItem(`hasCompletedWelcome_${userId}`) === 'true';
+    if (!hasSeenWelcome) {
+      // Only add welcome notification if not seen
+      const welcomeExists = loaded.some(n => n.id === '1' || n.title === 'Welcome!');
+      if (!welcomeExists) {
+        loaded = [
+          {
+            id: '1',
+            title: 'Welcome!',
+            message: 'Welcome to Fresh Market. Start exploring fresh products from local farms.',
+            type: 'order' as const,
+            read: false,
+            timestamp: new Date()
+          },
+          ...loaded
+        ];
       }
-    ];
+    } else {
+      // If welcome has been seen, remove it from notifications
+      loaded = loaded.filter(n => n.id !== '1' && n.title !== 'Welcome!');
+    }
+    return loaded;
   });
 
   const [hasCompletedWelcome, setHasCompletedWelcome] = useState(() => {
@@ -120,13 +137,17 @@ interface AppStateProviderProps {
   };
 
   const markNotificationAsRead = (id: string) => {
-    setNotifications(prev => 
-      prev.map(notification => 
-        notification.id === id 
+    setNotifications(prev =>
+      prev.map(notification =>
+        notification.id === id
           ? { ...notification, read: true }
           : notification
       )
     );
+    // If welcome notification is marked as read, persist seen status
+    if (id === '1') {
+      setHasCompletedWelcome(true);
+    }
   };
 
   const getUnreadCount = () => {

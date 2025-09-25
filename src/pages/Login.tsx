@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,7 +58,16 @@ const Login = () => {
   const [isRateLimited, setIsRateLimited] = useState(false);
   const [rateLimitCountdown, setRateLimitCountdown] = useState(0);
   const [deviceId, setDeviceId] = useState<string>("");
-  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [isOnline, setIsOnline] = useState(window.navigator.onLine);
+  useEffect(() => {
+    const updateOnlineStatus = () => setIsOnline(window.navigator.onLine);
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
   const [passwordValidation, setPasswordValidation] = useState<PasswordValidation>({
     minLength: false,
     hasNumber: false,
@@ -128,19 +138,7 @@ const Login = () => {
     }
   }, []);
 
-  // Network status monitoring
-  useEffect(() => {
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
+  // Network status monitoring is now handled by useNetworkStatus
 
   // Rate limiting countdown
   useEffect(() => {
@@ -271,37 +269,22 @@ const Login = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!isOnline) {
-      toast({
-        title: "No Internet Connection",
-        description: "Please check your internet connection and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
-    
     if (checkRateLimit(email)) {
       setIsRateLimited(true);
       return;
     }
-    
     setIsLoading(true);
-
     try {
       const { error } = await signIn(email, password);
-      
       if (!error) {
         // Success - clear failed attempts for this email
         const updatedAttempts = failedAttempts.filter(attempt => attempt.email !== email);
         setFailedAttempts(updatedAttempts);
         localStorage.setItem('loginFailedAttempts', JSON.stringify(updatedAttempts));
-        
         // Handle remember me
         if (rememberMe) {
           localStorage.setItem('rememberedEmail', email);
           localStorage.setItem('rememberMe', 'true');
-          
           // Add to trusted devices if not already trusted
           if (!isDeviceTrusted()) {
             addTrustedDevice(email);
@@ -314,7 +297,6 @@ const Login = () => {
           localStorage.removeItem('rememberedEmail');
           localStorage.setItem('rememberMe', 'false');
         }
-        
         navigate('/dashboard');
       } else {
         // Record failed attempt
@@ -518,32 +500,44 @@ const Login = () => {
               </div>
 
               {/* Remember Me Checkbox */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="remember-me"
-                  checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                  disabled={isRateLimited}
-                />
-                <Label 
-                  htmlFor="remember-me" 
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="remember-me"
+                    checked={rememberMe}
+                    onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                    disabled={isRateLimited}
+                  />
+                  <Label 
+                    htmlFor="remember-me" 
+                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                  >
+                    Remember me on this device
+                  </Label>
+                </div>
+                <Link 
+                  to="/reset-password" 
+                  className="text-sm text-primary hover:underline"
                 >
-                  Remember me on this device
-                </Label>
+                  Forgot Password?
+                </Link>
               </div>
 
+              {!isOnline && (
+                <div className="w-full mb-2 flex items-center justify-center">
+                  <AlertCircle className="h-4 w-4 text-red-500 mr-2" />
+                  <span className="text-red-500 text-sm">No Internet Connection</span>
+                </div>
+              )}
               <Button 
                 type="submit" 
                 className="w-full h-11 bg-gradient-to-r from-primary to-primary-light"
-                disabled={isLoading || isRateLimited || !isOnline}
+                disabled={isLoading || isRateLimited}
               >
                 {isLoading ? (
                   "Signing in..."
                 ) : isRateLimited ? (
                   `Locked (${formatCountdown(rateLimitCountdown)})`
-                ) : !isOnline ? (
-                  "No Internet Connection"
                 ) : (
                   "Sign In"
                 )}

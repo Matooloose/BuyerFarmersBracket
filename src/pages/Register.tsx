@@ -165,9 +165,13 @@ const Register = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  // Real-time form validation
+  // Real-time form validation with debouncing for username check
   useEffect(() => {
-    validateForm();
+    const timeoutId = setTimeout(() => {
+      validateForm();
+    }, 500); // Debounce for 500ms to avoid too many API calls
+    
+    return () => clearTimeout(timeoutId);
   }, [formData]);
 
   // Email verification countdown
@@ -185,9 +189,9 @@ const Register = () => {
     detectLocation();
   }, []);
 
-  const validateForm = () => {
+  const validateForm = async () => {
     const newValidation: FormValidation = {
-      username: validateUsername(formData.username),
+      username: await validateUsername(formData.username),
       email: validateEmail(formData.email),
       password: validatePassword(formData.password),
       confirmPassword: validateConfirmPassword(formData.password, formData.confirmPassword)
@@ -195,14 +199,37 @@ const Register = () => {
     
     setValidation(newValidation);
     updatePasswordStrength(formData.password);
+    return newValidation;
   };
 
-  const validateUsername = (username: string) => {
+  const validateUsername = async (username: string) => {
     if (username.length === 0) return { isValid: false, message: '' };
     if (username.length < 3) return { isValid: false, message: 'Username must be at least 3 characters' };
     if (username.length > 20) return { isValid: false, message: 'Username must be less than 20 characters' };
     if (!/^[a-zA-Z0-9_]+$/.test(username)) return { isValid: false, message: 'Username can only contain letters, numbers, and underscores' };
-    return { isValid: true, message: 'Username is available' };
+    
+    // Check if username already exists
+    try {
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('username')
+        .eq('username', username)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // PGRST116 = No rows found
+        console.error('Error checking username:', error);
+        return { isValid: false, message: 'Unable to verify username availability' };
+      }
+      
+      if (data) {
+        return { isValid: false, message: 'Username is already taken' };
+      }
+      
+      return { isValid: true, message: 'Username is available' };
+    } catch (error) {
+      console.error('Error checking username:', error);
+      return { isValid: false, message: 'Unable to verify username availability' };
+    }
   };
 
   const validateEmail = (email: string) => {

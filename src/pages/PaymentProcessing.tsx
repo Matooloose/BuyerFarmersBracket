@@ -50,8 +50,7 @@ import {
   Copy,
   QrCode,
   Banknote,
-  PiggyBank,
-  Gift
+  PiggyBank
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 

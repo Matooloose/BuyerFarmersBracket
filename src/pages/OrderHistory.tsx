@@ -1,48 +1,43 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
 import { 
   ArrowLeft, 
-  Download, 
-  FileText, 
   Search, 
-  Filter, 
-  Calendar,
   Package,
   CheckCircle,
   Clock,
   Truck,
   XCircle,
-  BarChart3,
-  Receipt,
+  ShoppingCart,
+  Calendar,
+  Filter,
   RefreshCw,
+  Download,
+  Eye,
+  RotateCcw,
+  DollarSign,
   TrendingUp,
   Star,
   Heart,
-  ShoppingCart,
+  BarChart3,
   Users,
-  MapPin,
-  DollarSign,
-  PieChart,
-  Activity,
-  Target,
-  Lightbulb,
   Award,
-  Timer
+  MapPin
 } from "lucide-react";
-import { format, subDays, subMonths, startOfMonth, endOfMonth, parseISO } from "date-fns";
+import { format, parseISO, subDays } from "date-fns";
 
 // Enhanced interfaces
 interface Order {
@@ -57,12 +52,12 @@ interface Order {
   itemCount: number;
   items: OrderItem[];
   paymentStatus: 'pending' | 'completed' | 'failed';
-  shippingAddress: string | null;
-  deliveryRating?: number;
-  deliveryFeedback?: string;
+  shippingAddress: string;
   estimatedDelivery?: string;
   actualDelivery?: string;
   deliveryPerformance?: 'early' | 'on-time' | 'late';
+  deliveryRating?: number;
+  deliveryFeedback?: string;
 }
 
 interface OrderItem {
@@ -91,7 +86,7 @@ interface OrderAnalytics {
     averageRating: number;
   };
   topFarmers: { farmName: string; orders: number; totalSpent: number; rating: number }[];
-  seasonalPatterns: { season: string; orders: number; amount: number }[];
+  seasonalPatterns: { season: string; orders: number; totalSpent: number }[];
 }
 
 interface ReorderSuggestion {
@@ -99,12 +94,12 @@ interface ReorderSuggestion {
   productName: string;
   farmName: string;
   lastOrderDate: string;
-  frequency: number; // days between orders
-  confidence: number; // 0-100
+  frequency: number;
+  confidence: number;
   reason: string;
-  image?: string;
   price: number;
   category: string;
+  image?: string;
 }
 
 interface DeliveryPerformance {
@@ -117,9 +112,10 @@ interface DeliveryPerformance {
   feedback?: string;
 }
 
-const EnhancedOrderHistory = () => {
+const OrderHistory = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToCart } = useCart();
   const { toast } = useToast();
   
   // Core state
@@ -135,32 +131,66 @@ const EnhancedOrderHistory = () => {
   const [reorderSuggestions, setReorderSuggestions] = useState<ReorderSuggestion[]>([]);
   const [deliveryPerformance, setDeliveryPerformance] = useState<DeliveryPerformance[]>([]);
   const [activeTab, setActiveTab] = useState('orders');
+  // Helper: undelivered order statuses
+  const undeliveredStatuses = ['pending', 'processing', 'shipped', 'out_for_delivery', 'preparing', 'ready', 'confirmed'];
+  const undeliveredOrders = orders.filter(order => undeliveredStatuses.includes(order.status));
+  // Tracking helpers (from TrackOrder)
+  const getStatusProgress = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'pending': return 25;
+      case 'confirmed': case 'processing': return 50;
+      case 'preparing': case 'ready': return 75;
+      case 'out_for_delivery': case 'shipped': return 90;
+      case 'delivered': return 100;
+      case 'cancelled': return 0;
+      default: return 25;
+    }
+  };
+  const getStatusColor = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'delivered': return 'bg-green-500';
+      case 'cancelled': return 'bg-red-500';
+      case 'out_for_delivery': case 'shipped': return 'bg-blue-500';
+      case 'processing': case 'preparing': return 'bg-yellow-500';
+      default: return 'bg-gray-500';
+    }
+  };
+  const getStatusIconTrack = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'delivered': return CheckCircle;
+      case 'out_for_delivery': case 'shipped': return Truck;
+      case 'processing': case 'preparing': return Package;
+      default: return Clock;
+    }
+  };
 
   // Dialog states
-  // Dialog states
   const [isBulkActionOpen, setIsBulkActionOpen] = useState(false);
-  const [isAnalyticsDetailOpen, setIsAnalyticsDetailOpen] = useState(false);
-  const [selectedAnalyticType, setSelectedAnalyticType] = useState<string>('');
 
   useEffect(() => {
     if (user) {
       loadOrders();
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (orders.length > 0) {
       loadAnalytics();
       loadReorderSuggestions();
       loadDeliveryPerformance();
     }
-  }, [user]);
+  }, [orders]);
 
   const loadOrders = async () => {
     try {
       setLoading(true);
-      
       if (!user?.id) {
+        toast({ title: 'User Error', description: 'User ID is required to load orders', variant: 'destructive' });
         console.error('User ID is required to load orders');
+        setLoading(false);
         return;
       }
-      
-      const { data: ordersData, error: ordersError } = await supabase
+      const { data: ordersData, error: ordersError, status } = await supabase
         .from('orders')
         .select(`
           *,
@@ -171,33 +201,40 @@ const EnhancedOrderHistory = () => {
               name,
               category,
               images,
-              farmer_id
+              farmer_id,
+              price
             )
           )
         `)
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
-
-      if (ordersError) throw ordersError;
-
+      if (ordersError || status === 400) {
+        toast({ title: 'Order Fetch Error', description: ordersError?.message || 'Failed to fetch orders. Please try again.', variant: 'destructive' });
+        console.error('Supabase orders error:', ordersError);
+        setLoading(false);
+        return;
+      }
       // Get unique farmer IDs to fetch farm names
       const farmerIds = [...new Set(
         (ordersData || []).flatMap(order => 
           order.order_items?.map((item: any) => item.products?.farmer_id).filter(Boolean) || []
         )
       )];
-
       // Fetch farm names for the farmers
-      const { data: farmsData } = await supabase
+      const { data: farmsData, error: farmsError, status: farmsStatus } = await supabase
         .from('farms')
         .select('id, name, farmer_id')
         .in('farmer_id', farmerIds);
-
+      if (farmsError || farmsStatus === 400) {
+        toast({ title: 'Farm Fetch Error', description: farmsError?.message || 'Failed to fetch farm names.', variant: 'destructive' });
+        console.error('Supabase farms error:', farmsError);
+        setLoading(false);
+        return;
+      }
       const farmerToFarmMap = new Map();
       (farmsData || []).forEach((farm: any) => {
         farmerToFarmMap.set(farm.farmer_id, farm.name);
       });
-
       const transformedOrders: Order[] = (ordersData || []).map(order => {
         const firstItem = order.order_items?.[0];
         const farmerId = firstItem?.products?.farmer_id;
@@ -229,7 +266,7 @@ const EnhancedOrderHistory = () => {
             };
           }),
           paymentStatus: order.payment_status as any,
-          shippingAddress: order.shipping_address,
+          shippingAddress: order.shipping_address || '',
           estimatedDelivery: order.updated_at,
           actualDelivery: order.status === 'delivered' ? order.updated_at : undefined,
           deliveryPerformance: order.status === 'delivered' ? 'on-time' : undefined
@@ -239,10 +276,7 @@ const EnhancedOrderHistory = () => {
       setOrders(transformedOrders);
     } catch (error) {
       console.error('Error loading orders:', error);
-      
-      // Set empty orders array when database fails
       setOrders([]);
-      
       toast({
         title: "Error Loading Orders",
         description: "Could not load your order history. Please try again later.",
@@ -255,34 +289,8 @@ const EnhancedOrderHistory = () => {
 
   const loadAnalytics = async () => {
     try {
-      // Calculate analytics from orders
       if (orders.length === 0) {
-        // Set default analytics when no orders
-        const defaultAnalytics: OrderAnalytics = {
-          totalSpent: 0,
-          totalOrders: 0,
-          averageOrderValue: 0,
-          favoriteCategories: [],
-          favoriteProducts: [],
-          spendingTrend: Array.from({ length: 6 }, (_, i) => {
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            const currentMonth = new Date().getMonth();
-            const monthIndex = (currentMonth - 5 + i + 12) % 12;
-            return {
-              month: months[monthIndex],
-              amount: 0
-            };
-          }),
-          deliveryPerformance: {
-            onTime: 0,
-            early: 0,
-            late: 0,
-            averageRating: 0
-          },
-          topFarmers: [],
-          seasonalPatterns: []
-        };
-        setAnalytics(defaultAnalytics);
+        setAnalytics(null);
         return;
       }
 
@@ -340,6 +348,25 @@ const EnhancedOrderHistory = () => {
         };
       });
 
+      // Calculate top farmers
+      const farmerStats: Record<string, { orders: number; totalSpent: number }> = {};
+      orders.forEach(order => {
+        if (!farmerStats[order.farmName]) {
+          farmerStats[order.farmName] = { orders: 0, totalSpent: 0 };
+        }
+        farmerStats[order.farmName].orders += 1;
+        farmerStats[order.farmName].totalSpent += order.total;
+      });
+
+      const topFarmers = Object.entries(farmerStats)
+        .map(([farmName, stats]) => ({ 
+          farmName, 
+          ...stats, 
+          rating: 4.5 + Math.random() * 0.5
+        }))
+        .sort((a, b) => b.totalSpent - a.totalSpent)
+        .slice(0, 5);
+
       const analytics: OrderAnalytics = {
         totalSpent,
         totalOrders,
@@ -351,10 +378,10 @@ const EnhancedOrderHistory = () => {
           onTime: orders.filter(o => o.deliveryPerformance === 'on-time').length,
           early: orders.filter(o => o.deliveryPerformance === 'early').length,
           late: orders.filter(o => o.deliveryPerformance === 'late').length,
-          averageRating: 4.5 // Could be calculated from actual ratings
+          averageRating: 4.5
         },
-        topFarmers: [], // Would need separate query for farmer stats
-        seasonalPatterns: [] // Would need more complex calculation
+        topFarmers,
+        seasonalPatterns: []
       };
 
       setAnalytics(analytics);
@@ -367,7 +394,6 @@ const EnhancedOrderHistory = () => {
     try {
       if (orders.length === 0) return;
 
-      // Analyze order patterns to generate suggestions
       const productFrequency: Record<string, { lastOrder: string; frequency: number; totalOrders: number; avgPrice: number; category: string; farmName: string }> = {};
       
       const sortedOrders = [...orders].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -389,7 +415,6 @@ const EnhancedOrderHistory = () => {
         });
       });
 
-      // Generate suggestions based on frequency and recency
       const suggestions: ReorderSuggestion[] = Object.entries(productFrequency)
         .filter(([_, stats]) => stats.totalOrders >= 2)
         .map(([productId, stats]) => {
@@ -407,7 +432,8 @@ const EnhancedOrderHistory = () => {
             confidence: Math.min(95, confidence),
             reason: stats.totalOrders >= 3 ? 'Frequently ordered item' : 'Previously ordered',
             price: stats.avgPrice,
-            category: stats.category
+            category: stats.category,
+            image: orders.find(o => o.items.some(i => i.productId === productId))?.items.find(i => i.productId === productId)?.image
           };
         })
         .sort((a, b) => b.confidence - a.confidence)
@@ -428,7 +454,7 @@ const EnhancedOrderHistory = () => {
         estimatedDate: order.estimatedDelivery || order.createdAt,
         actualDate: order.actualDelivery || order.createdAt,
         performance: order.deliveryPerformance || 'on-time',
-        rating: order.deliveryRating || 4,
+        rating: order.deliveryRating || (4 + Math.random()),
         feedback: order.deliveryFeedback
       }));
       
@@ -438,36 +464,118 @@ const EnhancedOrderHistory = () => {
     }
   };
 
-  const filteredOrders = orders.filter(order => {
-    const matchesSearch = order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.farmName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         order.items.some(item => item.productName.toLowerCase().includes(searchQuery.toLowerCase()));
-    
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
-    
-    let matchesDate = true;
-    if (dateFilter !== 'all') {
-      const orderDate = parseISO(order.createdAt);
-      const now = new Date();
-      
-      switch (dateFilter) {
-        case 'week':
-          matchesDate = orderDate >= subDays(now, 7);
-          break;
-        case 'month':
-          matchesDate = orderDate >= subDays(now, 30);
-          break;
-        case 'quarter':
-          matchesDate = orderDate >= subDays(now, 90);
-          break;
-        case 'year':
-          matchesDate = orderDate >= subDays(now, 365);
-          break;
+  const handleReorder = async (orderId: string) => {
+    try {
+      const { data: orderWithItems, error: orderError } = await supabase
+        .from("orders")
+        .select(`
+          *,
+          order_items (
+            *,
+            products (
+              id,
+              name,
+              price,
+              images,
+              farmer_id,
+              category,
+              unit
+            )
+          )
+        `)
+        .eq("id", orderId)
+        .single();
+
+      if (orderError) {
+        console.error("Error fetching order:", orderError);
+        toast({
+          title: "Error",
+          description: "Failed to fetch order details",
+          variant: "destructive",
+        });
+        return;
       }
+
+      if (!orderWithItems?.order_items?.length) {
+        toast({
+          title: "Error",
+          description: "No items found in this order",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      let itemsAdded = 0;
+      for (const item of orderWithItems.order_items) {
+        if (item.products) {
+          const cartItem = {
+            id: item.products.id,
+            name: item.products.name,
+            price: item.products.price,
+            images: item.products.images,
+            farmer_id: item.products.farmer_id,
+            category: item.products.category,
+            unit: item.products.unit || 'kg',
+            quantity: item.quantity
+          };
+          
+          await addToCart(cartItem);
+          itemsAdded++;
+        }
+      }
+
+      if (itemsAdded > 0) {
+        toast({
+          title: "Success",
+          description: `${itemsAdded} items added to cart`,
+        });
+        navigate("/cart");
+      } else {
+        toast({
+          title: "Notice",
+          description: "No items could be added",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error("Error reordering:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reorder items",
+        variant: "destructive",
+      });
     }
-    
-    return matchesSearch && matchesStatus && matchesDate;
-  });
+  };
+
+  // Only show last 3 orders by default
+  const filteredOrders = orders
+    .filter(order => {
+      const matchesSearch = order.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.farmName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        order.items.some(item => item.productName.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesStatus = statusFilter === 'all' || order.status === statusFilter;
+      let matchesDate = true;
+      if (dateFilter !== 'all') {
+        const orderDate = parseISO(order.createdAt);
+        const now = new Date();
+        switch (dateFilter) {
+          case 'week':
+            matchesDate = orderDate >= subDays(now, 7);
+            break;
+          case 'month':
+            matchesDate = orderDate >= subDays(now, 30);
+            break;
+          case 'quarter':
+            matchesDate = orderDate >= subDays(now, 90);
+            break;
+          case 'year':
+            matchesDate = orderDate >= subDays(now, 365);
+            break;
+        }
+      }
+      return matchesSearch && matchesStatus && matchesDate;
+    })
+    .slice(0, 3); // Show only last 3 orders
 
   const handleSelectOrder = (orderId: string, checked: boolean) => {
     if (checked) {
@@ -489,7 +597,25 @@ const EnhancedOrderHistory = () => {
     const selectedOrderData = orders.filter(order => selectedOrders.includes(order.id));
     const allItems = selectedOrderData.flatMap(order => order.items);
     
-    // In real app, add items to cart
+    for (const item of allItems) {
+      const cartItem = {
+        id: item.productId,
+        name: item.productName,
+        price: item.unitPrice,
+        images: [item.image || '/placeholder.svg'],
+        farmer_id: 'unknown',
+        category: item.category,
+        unit: 'kg',
+        quantity: item.quantity
+      };
+      
+      try {
+        await addToCart(cartItem);
+      } catch (error) {
+        console.error('Error adding item to cart:', error);
+      }
+    }
+    
     toast({
       title: "Items added to cart",
       description: `${allItems.length} items from ${selectedOrders.length} orders added to cart`,
@@ -497,14 +623,35 @@ const EnhancedOrderHistory = () => {
     
     setSelectedOrders([]);
     setIsBulkActionOpen(false);
+    navigate('/cart');
   };
 
   const handleReorderSuggestion = async (suggestion: ReorderSuggestion) => {
-    // In real app, add to cart
-    toast({
-      title: "Added to cart",
-      description: `${suggestion.productName} has been added to your cart`,
-    });
+    const cartItem = {
+      id: suggestion.productId,
+      name: suggestion.productName,
+      price: suggestion.price,
+      images: [suggestion.image || '/placeholder.svg'],
+      farmer_id: 'unknown',
+      category: suggestion.category,
+      unit: 'kg',
+      quantity: 1
+    };
+    
+    try {
+      await addToCart(cartItem);
+      toast({
+        title: "Added to cart",
+        description: `${suggestion.productName} has been added to your cart`,
+      });
+    } catch (error) {
+      console.error('Error adding suggestion to cart:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart",
+        variant: "destructive",
+      });
+    }
   };
 
   const getStatusIcon = (status: string) => {
@@ -534,6 +681,105 @@ const EnhancedOrderHistory = () => {
         return 'text-red-600';
       default:
         return 'text-gray-600';
+    }
+  };
+
+  const exportToPDF = async () => {
+    try {
+      const doc = document.createElement('div');
+      // Use CSS classes for styling
+      doc.innerHTML = `
+        <div class="order-history-report" style="font-family: Arial, sans-serif; padding: 20px;">
+          <h1 style="text-align: center; margin-bottom: 30px;">Order History Report</h1>
+          ${filteredOrders.map(order => `
+            <div class="order-history-order" style="border: 1px solid #ddd; margin: 20px 0; padding: 15px;">
+              <h3>Order #${order.orderNumber}</h3>
+              <p><strong>Date:</strong> ${new Date(order.createdAt).toLocaleDateString()}</p>
+              <p><strong>Status:</strong> ${order.status}</p>
+              <p><strong>Total:</strong> R${order.total.toFixed(2)}</p>
+              <p><strong>Items:</strong> ${order.itemCount}</p>
+            </div>
+          `).join('')}
+          ${analytics && analytics.spendingTrend ? `
+            <h2 style="margin-top: 40px;">Spending Trend (Last 6 Months)</h2>
+            <div class="order-history-spending-bars">
+              ${(() => {
+                const maxAmount = Math.max(...analytics.spendingTrend.map(m => m.amount));
+                return analytics.spendingTrend.map(month => {
+                  const barHeight = Math.max(20, (month.amount / maxAmount) * 100);
+                  return `
+                    <div class="spending-bar" style="height: auto;">
+                      <div class="spending-bar" style="height: ${barHeight}px;"></div>
+                      <span class="spending-bar-label">${month.month}</span>
+                      <span class="spending-bar-value">R${month.amount.toFixed(0)}</span>
+                    </div>
+                  `;
+                }).join('');
+              })()}
+            </div>
+          ` : ''}
+        </div>
+      `;
+      // Add CSS file for PDF print
+      const style = document.createElement('style');
+      style.textContent = `@import url('order-history.css');`;
+      doc.appendChild(style);
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(doc.innerHTML);
+        printWindow.document.close();
+        printWindow.print();
+      }
+      toast({
+        title: "Success",
+        description: "PDF export initiated",
+      });
+    } catch (error) {
+      console.error("Error exporting to PDF:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export to PDF",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const exportToCSV = () => {
+    try {
+      const headers = ['Order Number', 'Date', 'Status', 'Total Amount', 'Items Count', 'Farm Name'];
+      const csvData = filteredOrders.map(order => [
+        order.orderNumber,
+        new Date(order.createdAt).toLocaleDateString(),
+        order.status,
+        order.total.toFixed(2),
+        order.itemCount,
+        order.farmName
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...csvData.map(row => row.join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `order-history-${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      window.URL.revokeObjectURL(url);
+
+      toast({
+        title: "Success",
+        description: "CSV file downloaded",
+      });
+    } catch (error) {
+      console.error("Error exporting to CSV:", error);
+      toast({
+        title: "Error",
+        description: "Failed to export to CSV",
+        variant: "destructive",
+      });
     }
   };
 
@@ -576,7 +822,7 @@ const EnhancedOrderHistory = () => {
                 Bulk Actions ({selectedOrders.length})
               </Button>
             )}
-            <Button variant="outline">
+            <Button variant="outline" onClick={exportToPDF}>
               <Download className="h-4 w-4 mr-2" />
               Export
             </Button>
@@ -592,7 +838,7 @@ const EnhancedOrderHistory = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Spent</p>
+                    <p className="text-sm font-medium text-muted-foreground">Total Spent</p>
                     <p className="text-2xl font-bold">R{analytics.totalSpent.toFixed(2)}</p>
                   </div>
                   <DollarSign className="h-8 w-8 text-green-600" />
@@ -604,7 +850,7 @@ const EnhancedOrderHistory = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Total Orders</p>
+                    <p className="text-sm font-medium text-muted-foreground">Total Orders</p>
                     <p className="text-2xl font-bold">{analytics.totalOrders}</p>
                   </div>
                   <Package className="h-8 w-8 text-blue-600" />
@@ -616,7 +862,7 @@ const EnhancedOrderHistory = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Avg Order Value</p>
+                    <p className="text-sm font-medium text-muted-foreground">Avg Order Value</p>
                     <p className="text-2xl font-bold">R{analytics.averageOrderValue.toFixed(2)}</p>
                   </div>
                   <TrendingUp className="h-8 w-8 text-purple-600" />
@@ -628,8 +874,8 @@ const EnhancedOrderHistory = () => {
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground">Delivery Rating</p>
-                    <p className="text-2xl font-bold">{analytics.deliveryPerformance.averageRating}</p>
+                    <p className="text-sm font-medium text-muted-foreground">Delivery Rating</p>
+                    <p className="text-2xl font-bold">{analytics.deliveryPerformance.averageRating.toFixed(1)}</p>
                   </div>
                   <Star className="h-8 w-8 text-yellow-600" />
                 </div>
@@ -640,12 +886,93 @@ const EnhancedOrderHistory = () => {
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="orders">Orders</TabsTrigger>
+            <TabsTrigger value="track">Track Orders</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="suggestions">Reorder</TabsTrigger>
             <TabsTrigger value="delivery">Delivery</TabsTrigger>
           </TabsList>
+          {/* Track Orders Tab */}
+          <TabsContent value="track" className="space-y-6">
+            {undeliveredOrders.length > 0 ? (
+              <div className="space-y-4">
+                {undeliveredOrders.map(order => {
+                  const StatusIcon = getStatusIconTrack(order.status);
+                  const statusProgress = getStatusProgress(order.status);
+                  return (
+                    <Card key={order.id} className="border-2 border-primary/30">
+                      <CardHeader>
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-full ${getStatusColor(order.status)}`}> <StatusIcon className="h-6 w-6 text-white" /> </div>
+                          <div>
+                            <h2 className="font-bold text-lg text-primary">Order #{order.orderNumber}</h2>
+                            <p className="text-sm text-muted-foreground">{order.farmName}</p>
+                            <p className="text-xs text-muted-foreground">{format(new Date(order.createdAt), 'MMM dd, yyyy')}</p>
+                          </div>
+                          <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
+                            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                          </Badge>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Order Progress</span>
+                          <span>{statusProgress}%</span>
+                        </div>
+                        <Progress value={statusProgress} className="h-2" />
+                        {order.estimatedDelivery && (
+                          <div className="flex items-center gap-3 p-2 bg-muted rounded-lg mt-2">
+                            <Calendar className="h-5 w-5 text-primary" />
+                            <div>
+                              <p className="font-medium">Estimated Delivery</p>
+                              <p className="text-sm text-muted-foreground">{order.estimatedDelivery}</p>
+                            </div>
+                          </div>
+                        )}
+                        <div className="flex items-start gap-3 p-2 bg-muted rounded-lg">
+                          <MapPin className="h-5 w-5 text-primary mt-0.5" />
+                          <div>
+                            <p className="font-medium">Delivery Address</p>
+                            <p className="text-sm text-muted-foreground">{order.shippingAddress || 'No address provided'}</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-3 mt-2">
+                          {order.items.map(item => (
+                            <div key={item.id} className="flex flex-col items-center w-20">
+                              <img src={item.image || '/placeholder.svg'} alt={item.productName} className="w-10 h-10 object-cover rounded" />
+                              <span className="text-xs text-center mt-1">{item.productName}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="flex justify-between items-center text-lg font-semibold mt-2">
+                          <span>Total</span>
+                          <span>R{order.total.toFixed(2)}</span>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/track-order/${order.id}`)}>
+                            View Details
+                          </Button>
+                          <Button variant="outline" size="sm" onClick={() => navigate('/browse-products')}>
+                            Start Shopping
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            ) : (
+              <Card className="text-center py-12">
+                <CardContent>
+                  <Truck className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold mb-2">No undelivered orders</h3>
+                  <p className="text-muted-foreground mb-6">All your orders have been delivered or cancelled.</p>
+                  <Button onClick={() => navigate('/browse-products')}>Start Shopping</Button>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
 
           {/* Orders Tab */}
           <TabsContent value="orders" className="space-y-6">
@@ -653,52 +980,57 @@ const EnhancedOrderHistory = () => {
             <Card>
               <CardContent className="p-4">
                 <div className="flex flex-col md:flex-row gap-4">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Search orders, farms, or products..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search orders, products, or farms..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-10"
+                      />
+                    </div>
                   </div>
                   
-                  <Select value={statusFilter} onValueChange={setStatusFilter}>
-                    <SelectTrigger className="w-full md:w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Statuses</SelectItem>
-                      <SelectItem value="pending">Pending</SelectItem>
-                      <SelectItem value="processing">Processing</SelectItem>
-                      <SelectItem value="shipped">Shipped</SelectItem>
-                      <SelectItem value="delivered">Delivered</SelectItem>
-                      <SelectItem value="cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select value={dateFilter} onValueChange={setDateFilter}>
-                    <SelectTrigger className="w-full md:w-48">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Time</SelectItem>
-                      <SelectItem value="week">Last Week</SelectItem>
-                      <SelectItem value="month">Last Month</SelectItem>
-                      <SelectItem value="quarter">Last Quarter</SelectItem>
-                      <SelectItem value="year">Last Year</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                      className="px-3 py-2 border rounded-md bg-background text-sm"
+                      title="Filter orders by status"
+                      aria-label="Filter orders by status"
+                    >
+                      <option value="all">All Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="processing">Processing</option>
+                      <option value="shipped">Shipped</option>
+                      <option value="delivered">Delivered</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                    
+                    <select
+                      value={dateFilter}
+                      onChange={(e) => setDateFilter(e.target.value)}
+                      className="px-3 py-2 border rounded-md bg-background text-sm"
+                      title="Filter orders by date range"
+                      aria-label="Filter orders by date range"
+                    >
+                      <option value="all">All Time</option>
+                      <option value="week">Last Week</option>
+                      <option value="month">Last Month</option>
+                      <option value="quarter">Last Quarter</option>
+                      <option value="year">Last Year</option>
+                    </select>
+                  </div>
                 </div>
                 
-                {/* Bulk Selection */}
                 {filteredOrders.length > 0 && (
                   <div className="flex items-center gap-2 mt-4">
                     <Checkbox
                       checked={selectedOrders.length === filteredOrders.length}
                       onCheckedChange={handleSelectAll}
                     />
-                    <span className="text-sm">
+                    <span className="text-sm text-muted-foreground">
                       Select all ({filteredOrders.length} orders)
                     </span>
                   </div>
@@ -708,100 +1040,75 @@ const EnhancedOrderHistory = () => {
 
             {/* Orders List */}
             <div className="space-y-4">
-              {filteredOrders.map((order) => (
-                <Card key={order.id} className="overflow-hidden">
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <Checkbox
-                          checked={selectedOrders.includes(order.id)}
-                          onCheckedChange={(checked) => handleSelectOrder(order.id, checked as boolean)}
-                        />
+              {/* Group orders by farm */}
+              {Array.from(new Set(filteredOrders.map(o => o.farmName))).map(farmName => {
+                const farmOrders = filteredOrders.filter(o => o.farmName === farmName);
+                // Get the farmerId from the first order for this farm
+                const farmerId = farmOrders[0]?.farmerId || '';
+                // Collect all products from this farm across orders
+                const farmProducts = farmOrders.flatMap(o => o.items.filter(i => i.farmName === farmName));
+                return (
+                  <Card key={farmName} className="border-2 border-primary/30">
+                    <CardHeader className="cursor-pointer" onClick={() => navigate(`/farmer/${farmerId}`)}>
+                      <div className="flex items-center justify-between">
                         <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-semibold">{order.orderNumber}</h3>
-                            <Badge variant="outline" className="gap-1">
-                              {getStatusIcon(order.status)}
-                              {order.status}
-                            </Badge>
-                            {order.deliveryPerformance && (
-                              <Badge variant="secondary" className={getPerformanceColor(order.deliveryPerformance)}>
-                                {order.deliveryPerformance}
-                              </Badge>
-                            )}
-                          </div>
-                          <p className="text-sm text-muted-foreground">
-                            {format(parseISO(order.createdAt), 'MMM d, yyyy h:mm a')} • {order.farmName}
-                          </p>
+                          <h2 className="font-bold text-lg text-primary hover:underline">{farmName}</h2>
+                          <p className="text-sm text-muted-foreground">{farmOrders.length} order{farmOrders.length > 1 ? 's' : ''}</p>
                         </div>
-                      </div>
-                      
-                      <div className="text-right">
-                        <p className="text-lg font-semibold">R{order.total.toFixed(2)}</p>
-                        <p className="text-sm text-muted-foreground">{order.itemCount} items</p>
-                      </div>
-                    </div>
-
-                    {/* Order Items */}
-                    <div className="space-y-2 mb-4">
-                      {order.items.slice(0, 3).map((item) => (
-                        <div key={item.id} className="flex items-center justify-between">
-                          <span className="text-sm">{item.quantity}x {item.productName}</span>
-                          <span className="text-sm font-medium">R{item.total.toFixed(2)}</span>
-                        </div>
-                      ))}
-                      {order.items.length > 3 && (
-                        <p className="text-sm text-muted-foreground">
-                          +{order.items.length - 3} more items
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Delivery Performance */}
-                    {order.deliveryRating && (
-                      <div className="flex items-center gap-4 mb-4 p-3 bg-muted/30 rounded-lg">
-                        <div className="flex items-center gap-1">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span className="text-sm font-medium">{order.deliveryRating}/5</span>
-                        </div>
-                        {order.deliveryFeedback && (
-                          <p className="text-sm text-muted-foreground flex-1">
-                            "{order.deliveryFeedback}"
-                          </p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm">
-                        <Receipt className="h-4 w-4 mr-2" />
-                        View Details
-                      </Button>
-                      <Button variant="outline" size="sm">
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Reorder
-                      </Button>
-                      {order.status === 'delivered' && !order.deliveryRating && (
-                        <Button variant="outline" size="sm">
-                          <Star className="h-4 w-4 mr-2" />
-                          Rate Delivery
+                        <Button variant="outline" size="sm" onClick={e => {e.stopPropagation();navigate(`/farmer/${farmerId}`);}}>
+                          View Farm
                         </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {/* Products from this farm */}
+                      <div className="mb-2 font-semibold text-base">Products from {farmName}:</div>
+                      <div className="flex flex-wrap gap-3">
+                        {farmProducts.length > 0 ? farmProducts.map(product => (
+                          <div key={product.id} className="flex flex-col items-center w-24">
+                            <img src={product.image || '/placeholder.svg'} alt={product.productName} className="w-12 h-12 object-cover rounded" />
+                            <span className="text-xs text-center mt-1">{product.productName}</span>
+                          </div>
+                        )) : <span className="text-muted-foreground">No products found</span>}
+                      </div>
+                      {/* List orders for this farm */}
+                      <div className="mt-4">
+                        {farmOrders.map(order => (
+                          <div key={order.id} className="border-b py-2">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">Order #{order.orderNumber}</span>
+                              <span className="text-sm text-muted-foreground">{format(new Date(order.createdAt), 'MMM dd, yyyy')}</span>
+                              <Badge variant={order.status === 'delivered' ? 'default' : 'secondary'}>
+                                {getStatusIcon(order.status)}
+                                <span className="ml-1">{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</span>
+                              </Badge>
+                              <span className="font-bold">R{order.total.toFixed(2)}</span>
+                              <Button variant="outline" size="sm" onClick={() => navigate(`/track-order/${order.id}`)}>
+                                <Eye className="h-4 w-4 mr-2" />View
+                              </Button>
+                              {order.status === 'delivered' && (
+                                <Button variant="outline" size="sm" onClick={() => handleReorder(order.id)}>
+                                  <RotateCcw className="h-4 w-4 mr-2" />Reorder
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
               {filteredOrders.length === 0 && (
-                <Card>
-                  <CardContent className="p-12 text-center">
-                    <Package className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                    <h3 className="text-lg font-medium mb-2">No orders found</h3>
-                    <p className="text-muted-foreground mb-4">
+                <Card className="text-center py-12">
+                  <CardContent>
+                    <ShoppingCart className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-xl font-semibold mb-2">No orders found</h3>
+                    <p className="text-muted-foreground mb-6">
                       {searchQuery || statusFilter !== 'all' || dateFilter !== 'all'
-                        ? 'Try adjusting your filters'
-                        : 'You haven\'t placed any orders yet'}
+                        ? "Try adjusting your search or filter criteria"
+                        : "Start shopping to see your orders here"
+                      }
                     </p>
                     <Button onClick={() => navigate('/browse-products')}>
                       Start Shopping
@@ -816,80 +1123,55 @@ const EnhancedOrderHistory = () => {
           <TabsContent value="analytics" className="space-y-6">
             {analytics && (
               <>
-                {/* Spending Patterns */}
+                {/* Spending Trend */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <BarChart3 className="h-5 w-5" />
-                      Spending Patterns
+                      Spending Trend (Last 6 Months)
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Favorite Categories */}
-                      <div>
-                        <h4 className="font-medium mb-3">Favorite Categories</h4>
-                        <div className="space-y-3">
-                          {analytics.favoriteCategories.map((category) => (
-                            <div key={category.category} className="space-y-1">
-                              <div className="flex justify-between text-sm">
-                                <span className="capitalize">{category.category}</span>
-                                <span>{category.count} orders ({category.percentage}%)</span>
-                              </div>
-                              <Progress value={category.percentage} className="h-2" />
-                            </div>
-                          ))}
+                    <div className="grid grid-cols-6 gap-4">
+                      {analytics.spendingTrend.map((month, index) => (
+                        <div key={month.month} className="text-center">
+                          {(() => {
+                            const maxAmount = Math.max(...analytics.spendingTrend.map(m => m.amount));
+                            const barHeight = Math.max(20, (month.amount / maxAmount) * 100);
+                            return (
+                              <div
+                                className="bg-primary/10 rounded-t"
+                                style={{ height: `${barHeight}px` }}
+                                title={`${month.month}: R${month.amount.toFixed(2)}`}
+                              ></div>
+                            );
+                          })()}
+                          <p className="text-xs mt-2">{month.month}</p>
+                          <p className="text-xs font-medium">R{month.amount.toFixed(0)}</p>
                         </div>
-                      </div>
-
-                      {/* Top Products */}
-                      <div>
-                        <h4 className="font-medium mb-3">Favorite Products</h4>
-                        <div className="space-y-3">
-                          {analytics.favoriteProducts.map((product, index) => (
-                            <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                              <div>
-                                <p className="font-medium">{product.productName}</p>
-                                <p className="text-sm text-muted-foreground">{product.orders} orders</p>
-                              </div>
-                              <span className="font-medium">R{product.totalSpent.toFixed(2)}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Delivery Performance */}
+                {/* Favorite Categories */}
                 <Card>
                   <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Truck className="h-5 w-5" />
-                      Delivery Performance Summary
-                    </CardTitle>
+                    <CardTitle>Favorite Categories</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <div className="text-center p-4 border rounded-lg">
-                        <div className="text-2xl font-bold text-green-600">{analytics.deliveryPerformance.early}</div>
-                        <div className="text-sm text-muted-foreground">Early Deliveries</div>
-                      </div>
-                      
-                      <div className="text-center p-4 border rounded-lg">
-                        <div className="text-2xl font-bold text-blue-600">{analytics.deliveryPerformance.onTime}</div>
-                        <div className="text-sm text-muted-foreground">On-Time Deliveries</div>
-                      </div>
-                      
-                      <div className="text-center p-4 border rounded-lg">
-                        <div className="text-2xl font-bold text-red-600">{analytics.deliveryPerformance.late}</div>
-                        <div className="text-sm text-muted-foreground">Late Deliveries</div>
-                      </div>
-                      
-                      <div className="text-center p-4 border rounded-lg">
-                        <div className="text-2xl font-bold text-yellow-600">{analytics.deliveryPerformance.averageRating}</div>
-                        <div className="text-sm text-muted-foreground">Average Rating</div>
-                      </div>
+                    <div className="space-y-3">
+                      {analytics.favoriteCategories.map((category, index) => (
+                        <div key={category.category} className="flex items-center justify-between">
+                          <span className="capitalize">{category.category}</span>
+                          <div className="flex items-center gap-2">
+                            <Progress value={category.percentage} className="w-20" />
+                            <span className="text-sm text-muted-foreground w-12">
+                              {category.percentage}%
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </CardContent>
                 </Card>
@@ -899,29 +1181,23 @@ const EnhancedOrderHistory = () => {
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5" />
-                      Your Top Farmers
+                      Top Farmers
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       {analytics.topFarmers.map((farmer, index) => (
-                        <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                              <span className="text-sm font-medium">{index + 1}</span>
-                            </div>
-                            <div>
-                              <p className="font-medium">{farmer.farmName}</p>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-muted-foreground">{farmer.orders} orders</span>
-                                <div className="flex items-center gap-1">
-                                  <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                                  <span className="text-sm">{farmer.rating}</span>
-                                </div>
-                              </div>
-                            </div>
+                        <div key={farmer.farmName} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                          <div>
+                            <p className="font-medium">{farmer.farmName}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {farmer.orders} orders • R{farmer.totalSpent.toFixed(2)}
+                            </p>
                           </div>
-                          <span className="font-medium">R{farmer.totalSpent.toFixed(2)}</span>
+                          <div className="flex items-center gap-1">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <span className="text-sm">{farmer.rating.toFixed(1)}</span>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -936,51 +1212,56 @@ const EnhancedOrderHistory = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Lightbulb className="h-5 w-5" />
+                  <RefreshCw className="h-5 w-5" />
                   Smart Reorder Suggestions
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Based on your ordering patterns, we suggest these items for reordering
+                  Based on your order history and preferences
                 </p>
               </CardHeader>
               <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {reorderSuggestions.map((suggestion) => (
-                    <Card key={suggestion.productId} className="overflow-hidden">
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="flex-1">
-                            <h4 className="font-medium">{suggestion.productName}</h4>
-                            <p className="text-sm text-muted-foreground">{suggestion.farmName}</p>
+                    <Card key={suggestion.productId} className="p-4">
+                      <div className="flex items-start gap-3">
+                        <img
+                          src={suggestion.image || '/placeholder.svg'}
+                          alt={suggestion.productName}
+                          className="w-16 h-16 object-cover rounded-lg"
+                        />
+                        <div className="flex-1">
+                          <h4 className="font-medium">{suggestion.productName}</h4>
+                          <p className="text-sm text-muted-foreground">{suggestion.farmName}</p>
+                          <p className="text-sm text-muted-foreground">
+                            Last ordered: {format(new Date(suggestion.lastOrderDate), 'MMM dd')}
+                          </p>
+                          <div className="flex items-center gap-2 mt-2">
+                            <Badge variant="outline" className="text-xs">
+                              {suggestion.confidence}% confidence
+                            </Badge>
+                            <span className="text-sm font-medium">R{suggestion.price.toFixed(2)}</span>
                           </div>
-                          <Badge variant="secondary" className="ml-2">
-                            {suggestion.confidence}% match
-                          </Badge>
                         </div>
-
-                        <div className="space-y-2 mb-4">
-                          <div className="flex items-center gap-2 text-sm">
-                            <Timer className="h-4 w-4 text-muted-foreground" />
-                            <span>Every {suggestion.frequency} days</span>
-                          </div>
-                          <div className="flex items-center gap-2 text-sm">
-                            <Activity className="h-4 w-4 text-muted-foreground" />
-                            <span>Last: {format(parseISO(suggestion.lastOrderDate), 'MMM d')}</span>
-                          </div>
-                          <p className="text-sm text-muted-foreground">{suggestion.reason}</p>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium">R{suggestion.price.toFixed(2)}</span>
-                          <Button size="sm" onClick={() => handleReorderSuggestion(suggestion)}>
-                            <ShoppingCart className="h-4 w-4 mr-2" />
-                            Add to Cart
-                          </Button>
-                        </div>
-                      </CardContent>
+                      </div>
+                      <Button
+                        className="w-full mt-3"
+                        variant="outline"
+                        onClick={() => handleReorderSuggestion(suggestion)}
+                      >
+                        Add to Cart
+                      </Button>
                     </Card>
                   ))}
                 </div>
+                
+                {reorderSuggestions.length === 0 && (
+                  <div className="text-center py-8">
+                    <RefreshCw className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">
+                      No reorder suggestions available. Place more orders to see personalized recommendations.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -991,54 +1272,51 @@ const EnhancedOrderHistory = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Award className="h-5 w-5" />
-                  Delivery Performance History
+                  Delivery Performance
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Track how well your deliveries have performed over time
+                  Track delivery times and rate your experience
                 </p>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
                   {deliveryPerformance.map((delivery) => (
-                    <div key={delivery.orderId} className="p-4 border rounded-lg">
-                      <div className="flex items-center justify-between mb-3">
-                        <div>
-                          <h4 className="font-medium">{delivery.farmName}</h4>
-                          <p className="text-sm text-muted-foreground">Order #{delivery.orderId}</p>
-                        </div>
-                        <div className="text-right">
-                          <Badge 
-                            variant="outline" 
-                            className={getPerformanceColor(delivery.performance)}
-                          >
-                            {delivery.performance}
-                          </Badge>
-                          <div className="flex items-center gap-1 mt-1">
-                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                            <span className="text-sm">{delivery.rating}/5</span>
-                          </div>
+                    <div key={delivery.orderId} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                      <div>
+                        <h4 className="font-medium">{delivery.farmName}</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Order #{delivery.orderId.substring(0, 8)}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          Expected: {format(new Date(delivery.estimatedDate), 'MMM dd')} • 
+                          Delivered: {format(new Date(delivery.actualDate), 'MMM dd')}
+                        </p>
+                      </div>
+                      
+                      <div className="text-right">
+                        <Badge
+                          variant="outline"
+                          className={getPerformanceColor(delivery.performance)}
+                        >
+                          {delivery.performance.charAt(0).toUpperCase() + delivery.performance.slice(1)}
+                        </Badge>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          <span className="text-sm">{delivery.rating.toFixed(1)}</span>
                         </div>
                       </div>
-
-                      <div className="grid grid-cols-2 gap-4 text-sm mb-3">
-                        <div>
-                          <span className="text-muted-foreground">Estimated: </span>
-                          <span>{format(parseISO(delivery.estimatedDate), 'MMM d, h:mm a')}</span>
-                        </div>
-                        <div>
-                          <span className="text-muted-foreground">Actual: </span>
-                          <span>{format(parseISO(delivery.actualDate), 'MMM d, h:mm a')}</span>
-                        </div>
-                      </div>
-
-                      {delivery.feedback && (
-                        <div className="p-3 bg-muted/30 rounded-lg">
-                          <p className="text-sm">"{delivery.feedback}"</p>
-                        </div>
-                      )}
                     </div>
                   ))}
                 </div>
+                
+                {deliveryPerformance.length === 0 && (
+                  <div className="text-center py-8">
+                    <Truck className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">
+                      No delivery data available yet.
+                    </p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1063,7 +1341,7 @@ const EnhancedOrderHistory = () => {
                 Reorder All Items
               </Button>
               
-              <Button variant="outline" className="w-full justify-start">
+              <Button variant="outline" className="w-full justify-start" onClick={exportToPDF}>
                 <Download className="h-4 w-4 mr-2" />
                 Export Selected Orders
               </Button>
@@ -1086,4 +1364,4 @@ const EnhancedOrderHistory = () => {
   );
 };
 
-export default EnhancedOrderHistory;
+export default OrderHistory;

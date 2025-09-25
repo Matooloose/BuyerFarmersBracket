@@ -1,0 +1,10 @@
+/* Chart styles for OrderHistory analytics */
+.spending-trend-bar {
+  background: rgba(var(--primary), 0.1);
+  border-radius: 4px 4px 0 0;
+  transition: all 0.2s ease;
+}
+
+.spending-trend-bar:hover {
+  background: rgba(var(--primary), 0.2);
+}

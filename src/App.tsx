@@ -1,4 +1,5 @@
 import React, { Suspense } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -28,13 +29,14 @@ const HowItWorks = React.lazy(() => import("./pages/HowItWorks"));
 const ContactSupport = React.lazy(() => import("./pages/ContactSupport"));
 const CustomerSupport = React.lazy(() => import("./pages/CustomerSupport"));
 const Wishlist = React.lazy(() => import("./pages/Wishlist"));
-const OrderHistory = React.lazy(() => import("./pages/OrderHistory"));
+const OrderHistory = React.lazy(() => import("./pages/OrderHistory") as Promise<{ default: React.ComponentType<any> }>);
 const FAQ = React.lazy(() => import("./pages/FAQ"));
 const PaymentSuccess = React.lazy(() => import("./pages/PaymentSuccess"));
 const PaymentCancelled = React.lazy(() => import("./pages/PaymentCancelled"));
 const PayFastTest = React.lazy(() => import("./pages/PayFastTest"));
 const ProductReviews = React.lazy(() => import("./pages/ProductReviews"));
 const FarmerProfile = React.lazy(() => import("./pages/FarmerProfile"));
+const PasswordReset = React.lazy(() => import("./pages/PasswordReset"));
 
 const queryClient = new QueryClient();
 
@@ -47,53 +49,57 @@ const App = () => (
             <WishlistProvider>
               <Toaster />
               <Sonner />
-              <BrowserRouter
-                future={{
-                  v7_startTransition: true,
-                  v7_relativeSplatPath: true
-                }}
-              >
-                <Suspense fallback={
-                  <div className="min-h-screen bg-background flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                      <p className="text-muted-foreground">Loading...</p>
+              <ErrorBoundary>
+                <BrowserRouter
+                  future={{
+                    v7_startTransition: true,
+                    v7_relativeSplatPath: true
+                  }}
+                >
+                  <Suspense fallback={
+                    <div className="min-h-screen bg-background flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                        <p className="text-muted-foreground">Loading...</p>
+                      </div>
                     </div>
-                  </div>
-                }>
-                  <Routes>
-                    <Route path="/" element={<Login />} />
-                    <Route path="/welcome" element={<Welcome />} />
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
-                    <Route path="/dashboard" element={<Dashboard />} />
-                    <Route path="/home" element={<Dashboard />} />
-                    <Route path="/cart" element={<Cart />} />
-                    <Route path="/track-order" element={<TrackOrder />} />
-                    <Route path="/track-order/:orderId" element={<TrackOrder />} />
-                    <Route path="/browse-products" element={<BrowseProducts />} />
-                    <Route path="/product/:productId" element={<ProductDetail />} />
-                    <Route path="/checkout" element={<Checkout />} />
-                    <Route path="/profile" element={<UpdateProfile />} />
-                    <Route path="/update-profile" element={<UpdateProfile />} />
-                    <Route path="/subscriptions" element={<Subscriptions />} />
-                    <Route path="/messages" element={<Messages />} />
-                    <Route path="/wishlist" element={<Wishlist />} />
-                    <Route path="/order-history" element={<OrderHistory />} />
-                    <Route path="/how-it-works" element={<HowItWorks />} />
-                    <Route path="/contact-support" element={<ContactSupport />} />
-                    <Route path="/customer-support" element={<CustomerSupport />} />
-                    <Route path="/faq" element={<FAQ />} />
-                    <Route path="/product/:productId/reviews" element={<ProductReviews />} />
-                    <Route path="/farmer/:farmerId" element={<FarmerProfile />} />
-                    <Route path="/payment-success" element={<PaymentSuccess />} />
-                    <Route path="/payment-cancelled" element={<PaymentCancelled />} />
-                    <Route path="/payfast-test" element={<PayFastTest />} />
-                    {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-                    <Route path="*" element={<NotFound />} />
-                  </Routes>
-                </Suspense>
-              </BrowserRouter>
+                  }>
+                    <Routes>
+                      <Route path="/" element={<Login />} />
+                      <Route path="/welcome" element={<Welcome />} />
+                      <Route path="/login" element={<Login />} />
+                      <Route path="/register" element={<Register />} />
+                      <Route path="/reset-password" element={<PasswordReset />} />
+                      <Route path="/forgot-password" element={<PasswordReset />} />
+                      <Route path="/dashboard" element={<Dashboard />} />
+                      <Route path="/home" element={<Dashboard />} />
+                      <Route path="/cart" element={<Cart />} />
+                      <Route path="/track-order" element={<TrackOrder />} />
+                      <Route path="/track-order/:orderId" element={<TrackOrder />} />
+                      <Route path="/browse-products" element={<BrowseProducts />} />
+                      <Route path="/product/:productId" element={<ProductDetail />} />
+                      <Route path="/checkout" element={<Checkout />} />
+                      <Route path="/profile" element={<UpdateProfile />} />
+                      <Route path="/update-profile" element={<UpdateProfile />} />
+                      <Route path="/subscriptions" element={<Subscriptions />} />
+                      <Route path="/messages" element={<Messages />} />
+                      <Route path="/wishlist" element={<Wishlist />} />
+                      <Route path="/order-history" element={<OrderHistory />} />
+                      <Route path="/how-it-works" element={<HowItWorks />} />
+                      <Route path="/contact-support" element={<ContactSupport />} />
+                      <Route path="/customer-support" element={<CustomerSupport />} />
+                      <Route path="/faq" element={<FAQ />} />
+                      <Route path="/product/:productId/reviews" element={<ProductReviews />} />
+                      <Route path="/farmer/:farmerId" element={<FarmerProfile />} />
+                      <Route path="/payment-success" element={<PaymentSuccess />} />
+                      <Route path="/payment-cancelled" element={<PaymentCancelled />} />
+                      <Route path="/payfast-test" element={<PayFastTest />} />
+                      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+                      <Route path="*" element={<NotFound />} />
+                    </Routes>
+                  </Suspense>
+                </BrowserRouter>
+              </ErrorBoundary>
             </WishlistProvider>
           </CartProvider>
         </AppStateProvider>

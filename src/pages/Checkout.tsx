@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { getStripe, confirmStripePayment, createPaymentIntent } from "../lib/stripePayment";
-import { payFastService } from "../lib/payfast";
+import { payFastService, PAYFAST_CONFIG } from "../lib/payfast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,6 @@ import {
   ShieldCheck,
   Clock,
   Truck,
-  Gift,
   Edit,
   Plus,
   CheckCircle,
@@ -61,6 +60,17 @@ interface UserProfile {
   phone: string | null;
 }
 
+interface CartItem {
+  id: string;
+  name: string;
+  price: number;
+  unit: string;
+  quantity: number;
+  image?: string;
+  distance?: number; // km
+  weight?: number; // kg
+}
+
 interface DeliveryAddress {
   id: string;
   name: string;
@@ -87,33 +97,84 @@ interface PaymentMethod {
   isDefault?: boolean;
 }
 
-interface GiftOptions {
-  enabled: boolean;
-  message: string;
-  recipientName: string;
-  wrapStyle: 'standard' | 'premium' | 'eco';
-}
+
 
 const Checkout = () => {
+  // ...existing code...
+  // ...existing code...
+  // ...existing code...
   const navigate = useNavigate();
   const { toast } = useToast();
+  // Supabase session validation (must be after navigate and toast are declared)
+  useEffect(() => {
+    const checkSession = async () => {
+      try {
+        const { data, error } = await supabase.auth.getSession();
+        if (error || !data.session) {
+          toast({
+            title: "Session Expired",
+            description: "Please log in again to continue checkout.",
+            variant: "destructive",
+          });
+          navigate('/login');
+        }
+      } catch (err) {
+        toast({
+          title: "Authentication Error",
+          description: "Unable to validate session. Please log in again.",
+          variant: "destructive",
+        });
+        navigate('/login');
+      }
+    };
+    checkSession();
+  }, [navigate, toast]);
+  // Removed duplicate declarations
   const { cartItems, getTotalPrice, clearCart } = useCart();
   
-  // Temporary updateCartItem function for order editing
+  // Use CartContext for editing cart items
+  const { updateQuantity, removeItem } = useCart();
   const updateCartItem = (id: string, quantity: number) => {
-    // This would need to be implemented in the CartContext
-    console.log('Update cart item:', id, quantity);
+    if (quantity <= 0) {
+      removeItem(id);
+    } else {
+      updateQuantity(id, quantity);
+    }
   };
   const { checkoutData, updateCheckoutData, addNotification } = useAppState();
   const { user } = useAuth();
   
   const [userProfile, setUserProfile] = useState<UserProfile>({ name: '', address: '', phone: '' });
   const [formData, setFormData] = useState({
-    fullName: userProfile.name || (checkoutData.address ? checkoutData.address.split('\n')[0] : ""),
-    phoneNumber: userProfile.phone || "",
-    address: checkoutData.address || userProfile.address || "",
-    instructions: ""
+    fullName: '',
+    phoneNumber: '',
+    address: '',
+    instructions: '',
+    saveAddress: false,
+    promoCode: '',
+    agreeTerms: false
   });
+  // Update formData when userProfile or checkoutData changes
+  useEffect(() => {
+    setFormData(prev => {
+      const newFullName = userProfile.name || (checkoutData.address ? checkoutData.address.split('\n')[0] : "");
+      const newPhoneNumber = userProfile.phone || "";
+      const newAddress = checkoutData.address || userProfile.address || "";
+      if (
+        prev.fullName === newFullName &&
+        prev.phoneNumber === newPhoneNumber &&
+        prev.address === newAddress
+      ) {
+        return prev;
+      }
+      return {
+        ...prev,
+        fullName: newFullName,
+        phoneNumber: newPhoneNumber,
+        address: newAddress
+      };
+    });
+  }, [userProfile, checkoutData.address]);
 
   // Enhanced state management
   const [isOneClickMode, setIsOneClickMode] = useState(false);
@@ -124,18 +185,6 @@ const Checkout = () => {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string>('');
   const [deliveryTip, setDeliveryTip] = useState(0);
-  const [giftOptions, setGiftOptions] = useState<GiftOptions>({
-    enabled: false,
-    message: '',
-    recipientName: '',
-    wrapStyle: 'standard'
-  });
-  const [isEditingOrder, setIsEditingOrder] = useState(false);
-  const [recurringOrder, setRecurringOrder] = useState({
-    enabled: false,
-    frequency: 'weekly',
-    nextDelivery: new Date()
-  });
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [isProcessing, setIsProcessing] = useState(false);
   const [estimatedDelivery, setEstimatedDelivery] = useState<string>('');
@@ -143,14 +192,84 @@ const Checkout = () => {
     isValid: boolean;
     suggestions: string[];
   }>({ isValid: true, suggestions: [] });
+  const [isEditingOrder, setIsEditingOrder] = useState(false);
+  const [recurringOrder, setRecurringOrder] = useState({
+    enabled: false,
+    frequency: 'weekly',
+    nextDelivery: new Date()
+  });
 
-  // Delivery fee set by farmer - for demo, using dynamic calculation
-  const baseDeliveryFee = checkoutData.deliveryFee || 20;
+  // Delivery Fee Structure
+  const BASE_FEE = 30; // R30 covers first 5km and 5kg
+  const BASE_DISTANCE = 5; // km
+  const BASE_WEIGHT = 5; // kg
+  const DISTANCE_RATE = 5; // R5 per km over base
+  const WEIGHT_RATE = 5; // R5 per kg over base
+
+  // Memoized derived values for performance
+  const totalDistance = React.useMemo(() => (cartItems as any[]).reduce((sum, item) => sum + (item.distance || 0), 0), [cartItems]);
+  const totalWeight = React.useMemo(() => (cartItems as any[]).reduce((sum, item) => sum + (item.weight || 0), 0), [cartItems]);
+  const totalPrice = React.useMemo(() => getTotalPrice(), [cartItems, getTotalPrice]);
+  const distanceFee = React.useMemo(() => Math.max(0, totalDistance - BASE_DISTANCE) * DISTANCE_RATE, [totalDistance]);
+  const weightFee = React.useMemo(() => Math.max(0, totalWeight - BASE_WEIGHT) * WEIGHT_RATE, [totalWeight]);
+  const deliveryFee = React.useMemo(() => BASE_FEE + distanceFee + weightFee, [BASE_FEE, distanceFee, weightFee]);
+  const promoDiscount = formData.promoCode === "FARM10" ? totalPrice * 0.1 : 0;
+  const finalTotal = React.useMemo(() => totalPrice + deliveryFee + deliveryTip - promoDiscount, [totalPrice, deliveryFee, deliveryTip, promoDiscount]);
+
+  // Validation logic
+  const validateCheckout = React.useCallback(() => {
+    const errors: Record<string, string> = {};
+    if (!formData.fullName) errors.fullName = "Full name is required.";
+    if (!formData.phoneNumber) errors.phoneNumber = "Phone number is required.";
+    if (!formData.address) errors.address = "Delivery address is required.";
+    if (!selectedPaymentMethod) errors.payment = "Select a payment method.";
+    if (!formData.agreeTerms) errors.terms = "You must agree to terms.";
+    if (formData.promoCode && formData.promoCode !== "FARM10") errors.promoCode = "Promo code must be 'FARM10'.";
+    return errors;
+  }, [formData, selectedPaymentMethod]);
+
+  // useCallback for submit handler
+  const handleCheckout = React.useCallback(async () => {
+    setIsProcessing(true);
+    const errors = validateCheckout();
+    setValidationErrors(errors);
+    if (Object.keys(errors).length > 0) {
+      toast({ title: "Validation Error", description: "Please fix errors before submitting.", variant: "destructive" });
+      setIsProcessing(false);
+      return;
+    }
+    // ...existing submit logic...
+    setIsProcessing(false);
+  }, [validateCheckout, toast]);
+
+  // Fallback error handling for address validation
+  useEffect(() => {
+    if (!addressValidation.isValid) {
+      toast({ title: "Address Error", description: "Please check your address or use a suggestion.", variant: "destructive" });
+    }
+  }, [addressValidation, toast]);
+  // Removed duplicate totalWeight declaration
+
+  // Calculate extra distance/weight fees
+  const extraDistanceFee = Math.max(0, totalDistance - BASE_DISTANCE) * DISTANCE_RATE;
+  const extraWeightFee = Math.max(0, totalWeight - BASE_WEIGHT) * WEIGHT_RATE;
+
+  // Slot fee (time slot surcharge)
   const slotFee = selectedSlot?.price || 0;
-  const giftFee = giftOptions.enabled ? (giftOptions.wrapStyle === 'premium' ? 15 : giftOptions.wrapStyle === 'eco' ? 5 : 10) : 0;
-  const deliveryFee = baseDeliveryFee + slotFee + giftFee;
+
+  // Promo code logic
+  const [promoCodeValid, setPromoCodeValid] = useState(false);
+  const [promoCodeError, setPromoCodeError] = useState("");
+
   const subtotal = getTotalPrice();
-  const total = subtotal + deliveryFee + deliveryTip;
+  let orderValueDiscount = 0;
+  if (promoCodeValid && formData.promoCode === "FARM10") {
+    orderValueDiscount = subtotal * 0.10; // 10% off
+  }
+
+  // Final delivery fee
+  // Removed duplicate deliveryFee declaration
+  const total = subtotal + deliveryFee + deliveryTip - orderValueDiscount;
 
   // Load user data and preferences
   useEffect(() => {
@@ -158,9 +277,11 @@ const Checkout = () => {
       navigate('/dashboard');
       return;
     }
-    
+    // Only run once on mount
     initializeCheckout();
-  }, [cartItems.length, navigate]);
+    // Only run on mount, not on cartItems change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Debug effect to track payment method selection
   useEffect(() => {
@@ -226,7 +347,6 @@ const Checkout = () => {
         type: 'work',
         address: '123 Business Park, Cape Town, 8001',
         isDefault: false,
-        instructions: 'Reception desk'
       }
     ];
 
@@ -388,7 +508,7 @@ const Checkout = () => {
     // Save recurring order template
     const recurringData = {
       user_id: user?.id,
-      original_order_id: orderId,
+    
       frequency: recurringOrder.frequency,
       next_delivery: recurringOrder.nextDelivery,
       items: cartItems,
@@ -409,9 +529,12 @@ const Checkout = () => {
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
       ...prev,
-      [field]: value
+      [field]: field === 'saveAddress' || field === 'agreeTerms' ? Boolean(value) : value
     }));
-    
+    // Save address logic
+    if (field === 'saveAddress' && value) {
+      toast({ title: 'Address saved', description: 'Address will be available for future orders.' });
+    }
     // Clear validation error when user starts typing
     if (validationErrors[field]) {
       setValidationErrors(prev => ({ ...prev, [field]: '' }));
@@ -420,6 +543,20 @@ const Checkout = () => {
     // Auto-validate address
     if (field === 'address') {
       validateAddress(value);
+    }
+
+    // Promo code validation
+    if (field === 'promoCode') {
+      if (value === "FARM10") {
+        setPromoCodeValid(true);
+        setPromoCodeError("");
+      } else if (value.length > 0) {
+        setPromoCodeValid(false);
+        setPromoCodeError("Invalid promo code");
+      } else {
+        setPromoCodeValid(false);
+        setPromoCodeError("");
+      }
     }
   };
 
@@ -451,11 +588,20 @@ const Checkout = () => {
       errors.address = 'Please check your address format';
     }
 
+    // Terms & conditions
+    if (!formData.agreeTerms) {
+      errors.agreeTerms = 'You must agree to the terms & conditions';
+    }
+
     setValidationErrors(errors);
     return Object.keys(errors).length === 0;
   };
 
   const handlePlaceOrder = async () => {
+    // Guard: Only run if triggered by user event (button click)
+    if (typeof window !== 'undefined' && window.event && window.event.type !== 'click') {
+      return;
+    }
     // Check if cart is empty
     if (cartItems.length === 0) {
       toast({
@@ -463,7 +609,7 @@ const Checkout = () => {
         description: "Add some items to your cart first",
         variant: "destructive",
       });
-      navigate('/browse-products');
+      navigate('/cart');
       return;
     }
 
@@ -484,7 +630,7 @@ const Checkout = () => {
         description: "Please log in to place an order",
         variant: "destructive",
       });
-      navigate('/login');
+  navigate('/login');
       return;
     }
 
@@ -509,7 +655,8 @@ const Checkout = () => {
         phone_number: formData.phoneNumber,
         estimated_delivery: estimatedDelivery,
         delivery_slot: selectedSlot ? `${selectedSlot.date.toISOString().split('T')[0]} ${selectedSlot.timeSlot}` : null,
-        gift_options: giftOptions.enabled ? JSON.stringify(giftOptions) : null
+        delivery_tip: deliveryTip,
+        promo_code: formData.promoCode || null
       };
 
       const { data: order, error: orderError } = await supabase
@@ -518,9 +665,15 @@ const Checkout = () => {
         .select()
         .single();
 
-      if (orderError) {
+      if (orderError || !order) {
         console.error('Order creation error:', orderError);
-        throw new Error('Failed to create order. Please try again.');
+        toast({
+          title: 'Order Error',
+    description: typeof orderError === 'object' && orderError && 'message' in orderError ? (orderError as any).message : 'Failed to create order. Please try again.',
+          variant: 'destructive',
+        });
+        setIsProcessing(false);
+        return;
       }
 
       // Create order items
@@ -537,47 +690,83 @@ const Checkout = () => {
 
       if (itemsError) {
         console.error('Order items error:', itemsError);
-        throw new Error('Failed to add items to order. Please try again.');
+        toast({
+          title: 'Order Items Error',
+          description: typeof itemsError === 'object' && itemsError && 'message' in itemsError ? (itemsError as any).message : 'Failed to add items to order. Please try again.',
+          variant: 'destructive',
+        });
+        setIsProcessing(false);
+        return;
       }
 
       // Handle payment method
       const selectedMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethod);
-      
+
       if (selectedMethod?.type === "card") {
-        // Stripe payment flow
-        const { clientSecret } = await createPaymentIntent(total * 100, "usd");
-        const result = await confirmStripePayment(clientSecret);
-        
-        if (result.error) {
+        // PayFast payment flow for South African Rand
+        try {
+          const paymentData = await payFastService.createPayment({
+            amount: total,
+            itemName: `Order #${order.id.slice(0, 8)}`,
+            itemDescription: `${cartItems.length} items from FarmFresh Market`,
+            customerEmail: user.email || '',
+            customerName: `${user.user_metadata?.first_name || 'Customer'} ${user.user_metadata?.last_name || ''}`,
+            customerCell: formData.phoneNumber || '',
+            orderId: order.id
+          });
+
+          // Update order to pending payment
+          const { error: payfastUpdateError } = await supabase
+            .from('orders')
+            .update({
+              payment_status: 'pending',
+              status: 'pending'
+            })
+            .eq('id', order.id);
+          if (payfastUpdateError) {
+            toast({
+              title: 'Payment Status Error',
+              description: payfastUpdateError.message,
+              variant: 'destructive',
+            });
+            setIsProcessing(false);
+            return;
+          }
+
+          // Redirect to PayFast
+          payFastService.redirectToPayment(paymentData);
+          return; // Don't continue with rest of flow
+        } catch (error) {
+          console.error('PayFast payment error:', error);
           toast({
-            title: "Payment Failed",
-            description: result.error.message,
+            title: "Payment Error",
+            description: typeof error === 'object' && error && 'message' in error ? (error as any).message : "Failed to initialize payment. Please try again.",
             variant: "destructive",
           });
           setIsProcessing(false);
           return;
         }
 
-        // Update order status for successful payment
-        await supabase
-          .from('orders')
-          .update({
-            payment_status: 'completed',
-            status: 'processing'
-          })
-          .eq('id', order.id);
-
       } else if (selectedMethod?.type === "wallet") {
         // Digital wallet payment (simulated)
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        await supabase
+
+        const { error: walletUpdateError } = await supabase
           .from('orders')
           .update({
             payment_status: 'completed',
             status: 'processing'
           })
           .eq('id', order.id);
+        if (walletUpdateError) {
+          toast({
+            title: 'Payment Status Error',
+            description: walletUpdateError.message,
+            variant: 'destructive',
+          });
+          setIsProcessing(false);
+          return;
+        }
 
       } else if (selectedMethod?.type === "bank") {
         // Bank transfer - send instructions
@@ -588,13 +777,22 @@ const Checkout = () => {
 
       } else {
         // Cash on delivery
-        await supabase
+        const { error: cashUpdateError } = await supabase
           .from('orders')
           .update({
             payment_method: 'cash',
             status: 'processing'
           })
           .eq('id', order.id);
+        if (cashUpdateError) {
+          toast({
+            title: 'Payment Status Error',
+            description: cashUpdateError.message,
+            variant: 'destructive',
+          });
+          setIsProcessing(false);
+          return;
+        }
       }
 
       // Save as recurring order if enabled
@@ -617,13 +815,13 @@ const Checkout = () => {
       });
 
       // Navigate to track order
-      navigate(`/track-order?orderId=${order.id}`);
+  navigate(`/track-order?orderId=${order.id}`);
 
     } catch (error) {
       console.error('Error placing order:', error);
       toast({
         title: "Error",
-        description: "Failed to place order. Please try again.",
+        description: typeof error === 'object' && error && 'message' in error ? (error as any).message : "Failed to place order. Please try again.",
         variant: "destructive",
       });
     } finally {
@@ -825,6 +1023,7 @@ const Checkout = () => {
 
                 <div className="flex items-center space-x-2">
                   <Switch id="save-address" />
+                  <Switch id="save-address" checked={formData.saveAddress || false} onCheckedChange={checked => handleInputChange('saveAddress', checked ? 'true' : 'false')} />
                   <Label htmlFor="save-address" className="text-sm">
                     Save this address for future orders
                   </Label>
@@ -902,6 +1101,46 @@ const Checkout = () => {
                   ))}
                 </div>
                 <div className="space-y-2">
+                {/* Promo Code Input */}
+                <div className="flex items-center gap-2 mt-2">
+                  <Input
+                    placeholder="Promo code (optional)"
+                    value={formData.promoCode || ''}
+                    onChange={e => handleInputChange('promoCode', e.target.value)}
+                    className="w-40"
+                  />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!formData.promoCode}
+                    onClick={() => {
+                      if (promoCodeValid) {
+                        toast({ title: 'Promo code applied', description: '10% discount applied.' });
+                      } else if (formData.promoCode) {
+                        toast({ title: 'Promo code error', description: promoCodeError, variant: 'destructive' });
+                      }
+                    }}
+                  >
+                    Apply
+                  </Button>
+                  {promoCodeError && (
+                    <span className="text-xs text-destructive ml-2">{promoCodeError}</span>
+                  )}
+                </div>
+                {/* Terms & Conditions Checkbox */}
+                <div className="flex items-center gap-2 mt-4">
+                  <input
+                    type="checkbox"
+                    id="agreeTerms"
+                    checked={formData.agreeTerms || false}
+                    onChange={e => handleInputChange('agreeTerms', e.target.checked ? 'true' : 'false')}
+                    className="accent-primary w-4 h-4"
+                    aria-label="Agree to terms and conditions"
+                  />
+                  <Label htmlFor="agreeTerms" className="text-sm">
+                    I agree to the <a href="/terms" target="_blank" className="underline">terms & conditions</a>
+                  </Label>
+                </div>
                   <Label>Custom Amount</Label>
                   <Slider
                     value={[deliveryTip]}
@@ -916,86 +1155,6 @@ const Checkout = () => {
                     <span>R100</span>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Gift Options */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Gift className="h-5 w-5" />
-                  Gift Options
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center space-x-2">
-                  <Switch 
-                    checked={giftOptions.enabled}
-                    onCheckedChange={(enabled) => setGiftOptions(prev => ({ ...prev, enabled }))}
-                    id="gift-wrap"
-                  />
-                  <Label htmlFor="gift-wrap">This is a gift</Label>
-                </div>
-
-                {giftOptions.enabled && (
-                  <div className="space-y-4 mt-4">
-                    <div>
-                      <Label>Recipient Name</Label>
-                      <Input
-                        value={giftOptions.recipientName}
-                        onChange={(e) => setGiftOptions(prev => ({ 
-                          ...prev, 
-                          recipientName: e.target.value 
-                        }))}
-                        placeholder="Gift recipient's name"
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Gift Message</Label>
-                      <Textarea
-                        value={giftOptions.message}
-                        onChange={(e) => setGiftOptions(prev => ({ 
-                          ...prev, 
-                          message: e.target.value 
-                        }))}
-                        placeholder="Your gift message"
-                        rows={3}
-                      />
-                    </div>
-
-                    <div>
-                      <Label>Wrapping Style</Label>
-                      <RadioGroup
-                        value={giftOptions.wrapStyle}
-                        onValueChange={(value: any) => setGiftOptions(prev => ({ 
-                          ...prev, 
-                          wrapStyle: value 
-                        }))}
-                        className="grid grid-cols-3 gap-4 mt-2"
-                      >
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="standard" id="standard" />
-                          <Label htmlFor="standard" className="text-sm">
-                            Standard (+R10)
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="premium" id="premium" />
-                          <Label htmlFor="premium" className="text-sm">
-                            Premium (+R15)
-                          </Label>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <RadioGroupItem value="eco" id="eco" />
-                          <Label htmlFor="eco" className="text-sm">
-                            Eco-Friendly (+R5)
-                          </Label>
-                        </div>
-                      </RadioGroup>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -1149,6 +1308,10 @@ const Checkout = () => {
                     <div key={item.id} className="flex items-center justify-between p-3 border rounded-lg">
                       <div className="flex-1">
                         <p className="font-medium">{item.name}</p>
+                        {/* Show vendor/farmer name if available */}
+                        {(item as any).vendor && (
+                          <p className="text-xs text-muted-foreground">Farmer: {(item as any).vendor}</p>
+                        )}
                         <p className="text-sm text-muted-foreground">
                           R{item.price.toFixed(2)} per {item.unit}
                         </p>
@@ -1199,20 +1362,23 @@ const Checkout = () => {
                     <span className="text-muted-foreground">Subtotal</span>
                     <span>R{subtotal.toFixed(2)}</span>
                   </div>
+                  {/* Delivery Fee Breakdown */}
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Delivery Fee</span>
-                    <span>R{baseDeliveryFee.toFixed(2)}</span>
+                    <span className="text-muted-foreground">Base Delivery Fee</span>
+                    <span>R{BASE_FEE.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Extra Distance Fee</span>
+                    <span>R{extraDistanceFee.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Extra Weight Fee</span>
+                    <span>R{extraWeightFee.toFixed(2)}</span>
                   </div>
                   {slotFee > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Time Slot Fee</span>
                       <span>R{slotFee.toFixed(2)}</span>
-                    </div>
-                  )}
-                  {giftFee > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Gift Wrapping</span>
-                      <span>R{giftFee.toFixed(2)}</span>
                     </div>
                   )}
                   {deliveryTip > 0 && (
@@ -1222,6 +1388,12 @@ const Checkout = () => {
                     </div>
                   )}
                   <Separator />
+                  {orderValueDiscount > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Promo Discount</span>
+                      <span>-R{orderValueDiscount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between text-lg font-semibold">
                     <span>Total</span>
                     <span className="text-primary">R{total.toFixed(2)}</span>
@@ -1272,12 +1444,13 @@ const Checkout = () => {
         <div className="flex gap-2">
           <Button 
             onClick={() => {
+              if (isProcessing) return;
               if (!selectedPaymentMethod && paymentMethods.length > 0) {
-                setSelectedPaymentMethod(paymentMethods[0].id);
+                // Show error if no payment method selected
+                toast({ title: 'Select payment method', description: 'Please select a payment method before checkout.', variant: 'destructive' });
+                return;
               }
-              setTimeout(() => {
-                handlePlaceOrder();
-              }, 100);
+              handlePlaceOrder();
             }}
             disabled={isProcessing}
             className="flex-1"
@@ -1286,21 +1459,24 @@ const Checkout = () => {
           >
             Quick Checkout (Test)
           </Button>
-          
           <PaymentMethodDialog
             amount={total.toFixed(2)}
             onPaymentMethodSelect={(method) => {
-              console.log('Payment method selected:', method);
+              if (isProcessing) return;
               setSelectedPaymentMethod(method);
-              setTimeout(() => {
-                handlePlaceOrder();
-              }, 100);
             }}
             trigger={
               <Button 
                 disabled={isProcessing}
                 className="flex-1"
                 size="lg"
+                onClick={() => {
+                  if (!selectedPaymentMethod && paymentMethods.length > 0) {
+                    toast({ title: 'Select payment method', description: 'Please select a payment method before checkout.', variant: 'destructive' });
+                    return;
+                  }
+                  handlePlaceOrder();
+                }}
               >
                 {isProcessing ? (
                   <div className="flex items-center gap-2">

@@ -28,11 +28,11 @@ export interface PayFastConfig {
 }
 
 export const PAYFAST_CONFIG: PayFastConfig = {
-  merchantId: process.env.REACT_APP_PAYFAST_MERCHANT_ID || '10004002',
-  merchantKey: process.env.REACT_APP_PAYFAST_MERCHANT_KEY || '502c5eb9-8c1e-2adc-d4da-b5b098b4d6b2',
-  passphrase: process.env.REACT_APP_PAYFAST_PASSPHRASE || 'jt7NOE43FZPn',
-  sandbox: process.env.NODE_ENV !== 'production',
-  signatureUrl: process.env.REACT_APP_SIGNATURE_URL || 'http://localhost:3001/api/payfast-signature'
+  merchantId: import.meta.env.VITE_PAYFAST_MERCHANT_ID || '10004002',
+  merchantKey: import.meta.env.VITE_PAYFAST_MERCHANT_KEY || '502c5eb9-8c1e-2adc-d4da-b5b098b4d6b2',
+  passphrase: import.meta.env.VITE_PAYFAST_PASSPHRASE || 'jt7NOE43FZPn',
+  sandbox: import.meta.env.MODE !== 'production',
+  signatureUrl: import.meta.env.VITE_SIGNATURE_URL || 'http://localhost:3001/api/payfast-signature'
 };
 
 export const PAYFAST_URLS = {

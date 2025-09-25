@@ -28,20 +28,8 @@ interface ProfileData {
   name: string;
   email: string;
   phone: string;
-  address: string;
-  bio: string;
-  image_url: string;
   location: string;
-  email_opt_in: boolean;
-  sms_opt_in: boolean;
-  push_opt_in: boolean;
-  delivery_instructions: string;
-  preferred_delivery_time: string;
-  leave_at_door: boolean;
-  profile_visibility: 'public' | 'private' | 'friends';
-  show_purchase_history: boolean;
-  show_reviews: boolean;
-  show_activity_status: boolean;
+  address: string;
 }
 
 interface DeliveryPreferences {
@@ -127,6 +115,9 @@ const UpdateProfile = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
+
+  // Email verification enforcement
+  const isEmailVerified = Boolean(user?.email_confirmed_at || user?.confirmed_at);
   
   // Core state
   const [loading, setLoading] = useState(false);
@@ -135,20 +126,8 @@ const UpdateProfile = () => {
     name: '',
     email: '',
     phone: '',
-    address: '',
-    bio: '',
-    image_url: '',
     location: '',
-    email_opt_in: true,
-    sms_opt_in: false,
-    push_opt_in: true,
-    delivery_instructions: '',
-    preferred_delivery_time: 'anytime',
-    leave_at_door: false,
-    profile_visibility: 'public',
-    show_purchase_history: true,
-    show_reviews: true,
-    show_activity_status: false
+    address: ''
   });
 
   // Enhanced feature state
@@ -246,20 +225,8 @@ const UpdateProfile = () => {
           name: data.name || '',
           email: data.email || '',
           phone: data.phone || '',
-          address: data.address || '',
-          bio: data.bio || '',
-          image_url: data.image_url || '',
           location: data.location || '',
-          email_opt_in: (data as any).email_opt_in ?? true,
-          sms_opt_in: (data as any).sms_opt_in ?? false,
-          push_opt_in: (data as any).push_opt_in ?? true,
-          delivery_instructions: (data as any).delivery_instructions || '',
-          preferred_delivery_time: (data as any).preferred_delivery_time || 'anytime',
-          leave_at_door: (data as any).leave_at_door ?? false,
-          profile_visibility: ((data as any).profile_visibility as 'public' | 'private' | 'friends') || 'public',
-          show_purchase_history: (data as any).show_purchase_history ?? true,
-          show_reviews: (data as any).show_reviews ?? true,
-          show_activity_status: (data as any).show_activity_status ?? false
+          address: data.address || ''
         });
       }
     } catch (error) {
@@ -338,44 +305,32 @@ const UpdateProfile = () => {
   };
 
   const calculateProfileCompleteness = () => {
-    const suggestions = [
-      {
-        field: 'profile_picture',
-        description: 'Add a profile picture',
-        points: 15,
-        completed: !!profileData.image_url
-      },
-      {
-        field: 'bio',
-        description: 'Write a short bio about yourself',
-        points: 10,
-        completed: !!profileData.bio && profileData.bio.length > 20
-      },
-      {
-        field: 'phone',
-        description: 'Add your phone number',
-        points: 10,
-        completed: !!profileData.phone
-      },
-      {
-        field: 'address',
-        description: 'Complete your delivery address',
-        points: 15,
-        completed: !!profileData.address && profileData.address.length > 10
-      },
-      {
-        field: 'delivery_preferences',
-        description: 'Set up delivery preferences',
-        points: 10,
-        completed: !!deliveryPreferences.specificInstructions || deliveryPreferences.leaveAtDoor
-      },
-      {
-        field: 'communication_preferences',
-        description: 'Configure communication preferences',
-        points: 5,
-        completed: true // Always completed if they have any preferences set
-      }
-    ];
+  const suggestions = [
+    {
+      field: 'phone',
+      description: 'Add your phone number',
+      points: 10,
+      completed: !!profileData.phone
+    },
+    {
+      field: 'address',
+      description: 'Complete your delivery address',
+      points: 15,
+      completed: !!profileData.address && profileData.address.length > 10
+    },
+    {
+      field: 'delivery_preferences',
+      description: 'Set up delivery preferences',
+      points: 10,
+      completed: !!deliveryPreferences.specificInstructions || deliveryPreferences.leaveAtDoor
+    },
+    {
+      field: 'communication_preferences',
+      description: 'Configure communication preferences',
+      points: 5,
+      completed: true // Always completed if they have any preferences set
+    }
+  ];
 
     const completedPoints = suggestions.filter(s => s.completed).reduce((sum, s) => sum + s.points, 0);
     const totalPoints = suggestions.reduce((sum, s) => sum + s.points, 0);
@@ -649,6 +604,18 @@ const UpdateProfile = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Email Verification Blocker */}
+      {!isEmailVerified && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-lg flex flex-col items-center">
+            <Shield className="h-10 w-10 text-yellow-500 mb-2" />
+            <h2 className="text-lg font-bold mb-2">Verify Your Email</h2>
+            <p className="text-sm text-muted-foreground mb-4 text-center">You must verify your email address before accessing account settings. Please check your inbox for a verification link.</p>
+            <Button onClick={() => window.location.reload()} className="mb-2">I've Verified My Email</Button>
+            <Button variant="outline" onClick={() => navigate(-1)}>Go Back</Button>
+          </div>
+        </div>
+      )}
       {/* Header */}
       <header className="sticky top-0 z-50 bg-card border-b shadow-sm">
         <div className="flex items-center justify-between px-4 py-3">
@@ -661,6 +628,7 @@ const UpdateProfile = () => {
           
           <Button onClick={handleSave} disabled={loading}>
             {loading ? 'Saving...' : 'Save Changes'}
+            {!isEmailVerified && <span className="text-xs text-red-500 ml-2">(Verify email to enable)</span>}
           </Button>
         </div>
       </header>
@@ -709,11 +677,11 @@ const UpdateProfile = () => {
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="profile">Profile</TabsTrigger>
-            <TabsTrigger value="delivery">Delivery</TabsTrigger>
-            <TabsTrigger value="communication">Communication</TabsTrigger>
-            <TabsTrigger value="security">Security</TabsTrigger>
-            <TabsTrigger value="privacy">Privacy</TabsTrigger>
+            <TabsTrigger value="profile" disabled={!isEmailVerified}>Profile</TabsTrigger>
+            <TabsTrigger value="delivery" disabled={!isEmailVerified}>Delivery</TabsTrigger>
+            <TabsTrigger value="communication" disabled={!isEmailVerified}>Communication</TabsTrigger>
+            <TabsTrigger value="security" disabled={!isEmailVerified}>Security</TabsTrigger>
+            <TabsTrigger value="privacy" disabled={!isEmailVerified}>Privacy</TabsTrigger>
           </TabsList>
 
           {/* Profile Tab */}
@@ -730,7 +698,7 @@ const UpdateProfile = () => {
                 <div className="flex flex-col items-center space-y-4">
                   <div className="relative">
                     <Avatar className="h-24 w-24">
-                      <AvatarImage src={profileData.image_url} />
+                      {/* No image_url in ProfileData, fallback only */}
                       <AvatarFallback className="bg-primary text-primary-foreground">
                         <User className="h-8 w-8" />
                       </AvatarFallback>
@@ -803,16 +771,6 @@ const UpdateProfile = () => {
                   />
                 </div>
 
-                <div>
-                  <Label htmlFor="bio">Bio</Label>
-                  <Textarea
-                    id="bio"
-                    value={profileData.bio}
-                    onChange={(e) => handleInputChange('bio', e.target.value)}
-                    placeholder="Tell us about yourself"
-                    rows={3}
-                  />
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -1068,10 +1026,11 @@ const UpdateProfile = () => {
                 </div>
                 <Button 
                   onClick={handleChangePassword} 
-                  disabled={changePwLoading || !newPassword || newPassword !== confirmNewPassword}
+                  disabled={!isEmailVerified || changePwLoading || !newPassword || newPassword !== confirmNewPassword}
                   className="w-full"
                 >
                   {changePwLoading ? 'Changing...' : 'Change Password'}
+                  {!isEmailVerified && <span className="text-xs text-red-500 ml-2">(Verify email to enable)</span>}
                 </Button>
               </CardContent>
             </Card>
@@ -1197,8 +1156,8 @@ const UpdateProfile = () => {
                   <Label>Profile Visibility</Label>
                   <p className="text-sm text-muted-foreground mb-3">Who can see your profile information</p>
                   <Select
-                    value={profileData.profile_visibility}
-                    onValueChange={(value) => handleInputChange('profile_visibility', value as 'public' | 'private' | 'friends')}
+                    value={''}
+                    onValueChange={() => {}}
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -1223,8 +1182,8 @@ const UpdateProfile = () => {
                       <p className="text-sm text-muted-foreground">Display your order history to others</p>
                     </div>
                     <Switch
-                      checked={profileData.show_purchase_history}
-                      onCheckedChange={(checked) => handleInputChange('show_purchase_history', checked)}
+                      checked={false}
+                      onCheckedChange={() => {}}
                     />
                   </div>
 
@@ -1234,8 +1193,8 @@ const UpdateProfile = () => {
                       <p className="text-sm text-muted-foreground">Show reviews you've written</p>
                     </div>
                     <Switch
-                      checked={profileData.show_reviews}
-                      onCheckedChange={(checked) => handleInputChange('show_reviews', checked)}
+                      checked={false}
+                      onCheckedChange={() => {}}
                     />
                   </div>
 
@@ -1245,8 +1204,8 @@ const UpdateProfile = () => {
                       <p className="text-sm text-muted-foreground">Show when you're online</p>
                     </div>
                     <Switch
-                      checked={profileData.show_activity_status}
-                      onCheckedChange={(checked) => handleInputChange('show_activity_status', checked)}
+                      checked={false}
+                      onCheckedChange={() => {}}
                     />
                   </div>
                 </div>

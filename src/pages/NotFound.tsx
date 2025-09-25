@@ -36,7 +36,6 @@ import {
   Clock,
   Zap,
   Award,
-  Gift,
   Sparkles,
   TrendingUp
 } from "lucide-react";
@@ -372,11 +371,9 @@ const NotFound = () => {
   };
 
   const logPageNotFound = () => {
-    // Enhanced analytics logging
-    console.log('404 Analytics:', {
+    // Log 404 for debugging
+    console.log('404 Page:', {
       url: location.pathname,
-      referrer: document.referrer,
-      userAgent: navigator.userAgent,
       timestamp: new Date().toISOString()
     });
   };

@@ -818,6 +818,41 @@ const bottomNavItems = [
   { icon: MessageCircle, label: "Messages", path: "/messages" },
 ];
 
+// Location display state
+const [locationLabel, setLocationLabel] = useState<string>("Fetching location...");
+
+useEffect(() => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setUserActivity(prev => ({ ...prev, location: { latitude, longitude } }));
+        // Try to get city/region using a free reverse geocoding API
+        try {
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`);
+          const data = await res.json();
+          if (data.address) {
+            setLocationLabel(
+              data.address.city ||
+              data.address.town ||
+              data.address.village ||
+              data.address.state ||
+              `${latitude.toFixed(3)}, ${longitude.toFixed(3)}`
+            );
+          } else {
+            setLocationLabel(`${latitude.toFixed(3)}, ${longitude.toFixed(3)}`);
+          }
+        } catch {
+          setLocationLabel(`${latitude.toFixed(3)}, ${longitude.toFixed(3)}`);
+        }
+      },
+      () => setLocationLabel("Location unavailable")
+    );
+  } else {
+    setLocationLabel("Location unavailable");
+  }
+}, []);
+
 return (
   <ErrorBoundary>
     <div className="min-h-screen bg-background">
@@ -846,96 +881,98 @@ return (
                   <Menu className="h-5 w-5" />
                 </Button>
               </SheetTrigger>
-            <SheetContent side="left" className="w-80">
-              <SheetHeader className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-light rounded-full flex items-center justify-center">
-                    <Leaf className="h-6 w-6 text-primary-foreground" />
-                  </div>
-                  <div>
-                    <SheetTitle className="text-lg">FarmersBracket</SheetTitle>
-                    <p className="text-sm text-muted-foreground">shopleft</p>
-                  </div>
-                </div>
-              </SheetHeader>
-              <div className="mt-8 space-y-6">
-                {/* Profile */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-foreground">Profile</h3>
-                  <Button variant="ghost" className="w-full justify-start"
-                    onClick={() => handleNavigation('/profile')}>
-                    <User className="h-4 w-4 mr-3" />
-                    Update Profile
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start"
-                    onClick={() => handleNavigation('/wishlist')}>
-                    <Heart className="h-4 w-4 mr-3" />
-                    My Wishlist
-                  </Button>
-                  <Button variant="ghost" className="w-full justify-start"
-                    onClick={() => handleNavigation('/order-history')}>
-                    <Package className="h-4 w-4 mr-3" />
-                    Order History
-                  </Button>
-                </div>
-                <Separator />
-                {/* Information */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-foreground">Information</h3>
-                  <Button variant="ghost" className="w-full justify-start"
-                    onClick={() => handleNavigation('/how-it-works')}>
-                    <Info className="h-4 w-4 mr-3" />
-                    How It Works
-                  </Button>
-                </div>
-                <Separator />
-                {/* Settings */}
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-foreground">Settings</h3>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      {darkMode ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-                      <Label htmlFor="dark-mode">Dark Mode</Label>
+              <SheetContent side="left" className="w-80">
+                <SheetHeader className="space-y-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-light rounded-full flex items-center justify-center">
+                      <Leaf className="h-6 w-6 text-primary-foreground" />
                     </div>
-                    <Switch id="dark-mode" checked={darkMode} onCheckedChange={handleDarkModeChange} />
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-3">
-                      <Bell className="h-4 w-4" />
-                      <Label htmlFor="notifications">Notifications</Label>
+                    <div>
+                      <SheetTitle className="text-lg">FarmersBracket</SheetTitle>
+                      <p className="text-sm text-muted-foreground">shopleft</p>
                     </div>
-                    <Switch id="notifications" checked={notifications} onCheckedChange={handleNotificationsChange} />
                   </div>
-                </div>
-                <Separator />
-                {/* Logout */}
-                <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive"
-                  onClick={() => setLogoutDialogOpen(true)}>
-                  <LogOut className="h-4 w-4 mr-3" />
-                  Logout
-                </Button>
-                <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Are you sure you want to logout?</DialogTitle>
-                      <DialogDescription>
-                        This will sign you out of your account and return you to the login page.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                      <Button variant="outline" onClick={() => setLogoutDialogOpen(false)}>No</Button>
-                      <Button variant="destructive" onClick={handleLogout}>Yes</Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
-              </div>
-            </SheetContent>
-          </Sheet>
+                </SheetHeader>
+                <ScrollArea className="h-[calc(100vh-4rem)] pr-2">
+                  <div className="mt-8 space-y-6">
+                    {/* Profile */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-foreground">Profile</h3>
+                      <Button variant="ghost" className="w-full justify-start"
+                        onClick={() => handleNavigation('/profile')}>
+                        <User className="h-4 w-4 mr-3" />
+                        Update Profile
+                      </Button>
+                      <Button variant="ghost" className="w-full justify-start"
+                        onClick={() => handleNavigation('/wishlist')}>
+                        <Heart className="h-4 w-4 mr-3" />
+                        My Wishlist
+                      </Button>
+                      <Button variant="ghost" className="w-full justify-start"
+                        onClick={() => handleNavigation('/order-history')}>
+                        <Package className="h-4 w-4 mr-3" />
+                        Order History
+                      </Button>
+                    </div>
+                    <Separator />
+                    {/* Information */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-foreground">Information</h3>
+                      <Button variant="ghost" className="w-full justify-start"
+                        onClick={() => handleNavigation('/how-it-works')}>
+                        <Info className="h-4 w-4 mr-3" />
+                        How It Works
+                      </Button>
+                    </div>
+                    <Separator />
+                    {/* Settings */}
+                    <div className="space-y-4">
+                      <h3 className="font-semibold text-foreground">Settings</h3>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          {darkMode ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                          <Label htmlFor="dark-mode">Dark Mode</Label>
+                        </div>
+                        <Switch id="dark-mode" checked={darkMode} onCheckedChange={handleDarkModeChange} />
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <Bell className="h-4 w-4" />
+                          <Label htmlFor="notifications">Notifications</Label>
+                        </div>
+                        <Switch id="notifications" checked={notifications} onCheckedChange={handleNotificationsChange} />
+                      </div>
+                    </div>
+                    <Separator />
+                    {/* Logout */}
+                    <Button variant="ghost" className="w-full justify-start text-destructive hover:text-destructive"
+                      onClick={() => setLogoutDialogOpen(true)}>
+                      <LogOut className="h-4 w-4 mr-3" />
+                      Logout
+                    </Button>
+                    <Dialog open={logoutDialogOpen} onOpenChange={setLogoutDialogOpen}>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Are you sure you want to logout?</DialogTitle>
+                          <DialogDescription>
+                            This will sign you out of your account and return you to the login page.
+                          </DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setLogoutDialogOpen(false)}>No</Button>
+                          <Button variant="destructive" onClick={handleLogout}>Yes</Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </ScrollArea>
+              </SheetContent>
+            </Sheet>
           <div>
             <h1 className="text-lg font-semibold text-foreground">FarmersBracket</h1>
             <div className="flex items-center text-sm text-muted-foreground">
               <MapPin className="h-4 w-4 mr-1" />
-              <span>Your Location</span>
+              <span>{locationLabel}</span>
             </div>
           </div>
         </div>
@@ -1518,26 +1555,29 @@ return (
     {/* Bottom Navigation */}
     <nav className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-strong safe-area-bottom-nav" role="navigation" aria-label="Main navigation">
       <div className="flex items-center justify-around py-2">
-        {bottomNavItems.map(item => (
-          <Button
-            key={item.path}
-            variant="ghost"
-            size="sm"
-            className="flex flex-col items-center px-3 py-2 h-auto text-primary"
-            onClick={() => handleNavigation(item.path)}
-            aria-label={`Navigate to ${item.label}`}
-          >
-            <div className="relative">
-              <item.icon className="h-5 w-5 mb-1" />
-              {item.label === "Cart" && getTotalItems() > 0 && (
-                <Badge className="absolute -top-2 -right-2 text-xs px-1 py-0.5 rounded-full bg-primary text-white">
-                  {getTotalItems()}
-                </Badge>
-              )}
-            </div>
-            <span className="text-xs">{item.label}</span>
-          </Button>
-        ))}
+          {bottomNavItems.map(item => {
+            const isActive = window.location.pathname === item.path;
+            return (
+              <Button
+                key={item.path}
+                variant={isActive ? 'default' : 'ghost'}
+                size="sm"
+                className={`flex flex-col items-center px-3 py-2 h-auto ${isActive ? 'text-primary font-bold bg-green-500/30' : 'text-muted-foreground'}`}
+                onClick={() => handleNavigation(item.path)}
+                aria-label={`Navigate to ${item.label}`}
+              >
+                <div className="relative">
+                  <item.icon className="h-5 w-5 mb-1" />
+                  {item.label === "Cart" && getTotalItems() > 0 && (
+                    <Badge className="absolute -top-2 -right-2 text-xs px-1 py-0.5 rounded-full bg-primary text-white">
+                      {getTotalItems()}
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-xs">{item.label}</span>
+              </Button>
+            );
+          })}
       </div>
     </nav>
     
