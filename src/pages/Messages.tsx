@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import BottomNavBar from "@/components/BottomNavBar";
 import { 
   ArrowLeft, 
   Send, 
@@ -638,33 +639,7 @@ const Messages: React.FC = () => {
       </Dialog>
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-strong">
-        <div className="flex items-center justify-around py-2">
-            {bottomNavItems.map(item => {
-              const isActive = window.location.pathname === item.path;
-              return (
-                <Button
-                  key={item.path}
-                  variant={isActive ? 'default' : 'ghost'}
-                  size="sm"
-                  className={`flex flex-col items-center px-3 py-2 h-auto ${isActive ? 'text-primary font-bold bg-green-500/30' : 'text-muted-foreground'}`}
-                  onClick={() => navigate(item.path)}
-                  aria-label={`Navigate to ${item.label}`}
-                >
-                  <div className="relative">
-                    <item.icon className="h-5 w-5 mb-1" />
-                    {item.label === "Cart" && getTotalItems() > 0 && (
-                      <Badge className="absolute -top-2 -right-2 text-xs px-1 py-0.5 rounded-full bg-primary text-white">
-                        {getTotalItems()}
-                      </Badge>
-                    )}
-                  </div>
-                  <span className="text-xs">{item.label}</span>
-                </Button>
-              );
-            })}
-        </div>
-      </nav>
+      <BottomNavBar />
     </div>
   );
 };

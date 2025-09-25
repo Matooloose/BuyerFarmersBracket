@@ -10,6 +10,7 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Order } from "@/types/order";
 import { ArrowLeft, Package, Truck, CheckCircle, Clock, Phone, MessageCircle, MapPin, Calendar, Info, Package2, ShoppingCart } from "lucide-react";
+import BottomNavBar from "@/components/BottomNavBar";
 
 const TrackOrder = () => {
   const { orderId: paramOrderId } = useParams();
@@ -326,33 +327,10 @@ const TrackOrder = () => {
         </div>
 
       {/* Bottom Navigation Bar */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-strong safe-area-bottom-nav" role="navigation" aria-label="Main navigation">
-        <div className="flex items-center justify-around py-2">
-          {[
-            { icon: 'Home', label: 'Home', path: '/dashboard' },
-            { icon: 'ShoppingCart', label: 'Cart', path: '/cart' },
-            { icon: 'Package', label: 'Track', path: '/track-order' },
-            { icon: 'Search', label: 'Browse', path: '/browse-products' },
-            { icon: 'MessageCircle', label: 'Messages', path: '/messages' },
-          ].map(item => {
-            const Icon = require('lucide-react')[item.icon];
-            const isActive = window.location.pathname === item.path;
-            return (
-              <Button
-                key={item.path}
-                variant={isActive ? 'default' : 'ghost'}
-                size="sm"
-                className={`flex flex-col items-center px-3 py-2 h-auto ${isActive ? 'text-primary font-bold bg-green-500/30' : 'text-muted-foreground'}`}
-                onClick={() => navigate(item.path)}
-                aria-label={`Navigate to ${item.label}`}
-              >
-                <Icon className="h-5 w-5 mb-1" />
-                <span className="text-xs">{item.label}</span>
-              </Button>
-            );
-          })}
-        </div>
-      </nav>
+      <div>
+        {/* ...existing code... */}
+        <BottomNavBar />
+      </div>
       </main>
     </div>
   );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
+import BottomNavBar from "@/components/BottomNavBar";
 import {
   ArrowLeft,
   Plus,
@@ -98,7 +99,8 @@ const Cart = () => {
     loadSmartSuggestions();
   }, [loadSmartSuggestions]);
 
-  // Fix JSX structure below
+
+  // Fixed JSX structure
   return (
     <div className="min-h-screen bg-background flex flex-col">
       {/* Header */}
@@ -119,7 +121,7 @@ const Cart = () => {
         </div>
       </header>
       {/* Cart Items */}
-      <div className="px-4 py-2">
+      <div className="px-4 py-2 flex-1">
         {cartItems.length === 0 ? (
           <div className="text-center py-8 text-muted-foreground">
             <ShoppingCart className="mx-auto mb-4 w-12 h-12 opacity-50" />
@@ -127,30 +129,27 @@ const Cart = () => {
             <Button className="mt-4" onClick={() => navigate("/browse-products")}>Browse Products</Button>
           </div>
         ) : (
-          <div className="space-y-4">
-            {cartItems.map((item) => (
-              <Card key={item.id} className="flex items-center justify-between">
-                <CardContent className="flex items-center gap-4">
-                  <img src={item.image} alt={item.name} className="w-16 h-16 rounded object-cover" />
-                  <div className="flex-1">
-                    <div className="font-semibold">{item.name}</div>
-                    <div className="text-sm text-muted-foreground">R{item.price.toFixed(2)} x {item.quantity}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="icon" onClick={() => updateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1}><Minus /></Button>
-                    <span>{item.quantity}</span>
-                    <Button variant="ghost" size="icon" onClick={() => updateQuantity(item.id, item.quantity + 1)}><Plus /></Button>
-                  </div>
-                  <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)}><Trash2 /></Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-        {/* Only show total and checkout if cart is not empty */}
-        {cartItems.length > 0 ? (
           <>
-            <div className="flex items-center gap-2">
+            <div className="space-y-4">
+              {cartItems.map((item) => (
+                <Card key={item.id} className="flex items-center justify-between">
+                  <CardContent className="flex items-center gap-4">
+                    <img src={item.image} alt={item.name} className="w-16 h-16 rounded object-cover" />
+                    <div className="flex-1">
+                      <div className="font-semibold">{item.name}</div>
+                      <div className="text-sm text-muted-foreground">R{item.price.toFixed(2)} x {item.quantity}</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="ghost" size="icon" onClick={() => updateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1}><Minus /></Button>
+                      <span>{item.quantity}</span>
+                      <Button variant="ghost" size="icon" onClick={() => updateQuantity(item.id, item.quantity + 1)}><Plus /></Button>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => removeItem(item.id)}><Trash2 /></Button>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 mt-4">
               <Input
                 type="text"
                 placeholder="Promo code"
@@ -198,10 +197,10 @@ const Cart = () => {
               Proceed to Checkout
             </Button>
           </>
-        ) : null}
+        )}
       </div>
+      <BottomNavBar />
     </div>
-
   );
 }
 

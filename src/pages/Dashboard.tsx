@@ -54,7 +54,9 @@ import {
   Award,
   ThumbsUp,
   MoreHorizontal,
-  RefreshCw
+  RefreshCw,
+  CheckCircle,
+  Truck
 } from "lucide-react";
 import { NotificationIcon } from "@/components/NotificationIcon";
 import AvailableFarms from "@/components/AvailableFarms";
@@ -64,6 +66,8 @@ import ProductQuickView from "@/components/ProductQuickView";
 import AdvancedFilters, { FilterOptions } from "@/components/AdvancedFilters";
 import PullToRefreshIndicator from "@/components/PullToRefreshIndicator";
 import { ProductRating } from "@/components/ProductRating";
+
+import BottomNavBar from "@/components/BottomNavBar";
 
 interface Product {
 id: string;
@@ -155,7 +159,61 @@ const [loading, setLoading] = useState(true);
 const [searchTerm, setSearchTerm] = useState("");
 const [addingToCart, setAddingToCart] = useState<string | null>(null);
 const [quickViewProduct, setQuickViewProduct] = useState<Product | null>(null);
-const [farmNames, setFarmNames] = useState<Record<string, string>>({});
+  const [farmNames, setFarmNames] = useState<Record<string, string>>({});
+	
+  // Track Orders Modal State
+  const [trackOrdersOpen, setTrackOrdersOpen] = useState(false);
+  const [orders, setOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+	
+  // Helper: undelivered order statuses
+  const undeliveredStatuses = ['pending', 'processing', 'shipped', 'out_for_delivery', 'preparing', 'ready', 'confirmed'];
+  const undeliveredOrders = orders.filter(order => undeliveredStatuses.includes(order.status));
+	
+  const getStatusProgress = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'pending': return 25;
+      case 'confirmed': case 'processing': return 50;
+      case 'preparing': case 'ready': return 75;
+      case 'out_for_delivery': case 'shipped': return 90;
+      case 'delivered': return 100;
+      case 'cancelled': return 0;
+      default: return 25;
+    }
+  };
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'delivered': return 'bg-green-500';
+      case 'cancelled': return 'bg-red-500';
+      case 'out_for_delivery': case 'shipped': return 'bg-blue-500';
+      case 'processing': case 'preparing': return 'bg-yellow-500';
+      default: return 'bg-gray-500';
+    }
+  };
+  const getStatusIconTrack = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'delivered': return CheckCircle;
+      case 'out_for_delivery': case 'shipped': return Truck;
+      case 'processing': case 'preparing': return Package;
+      default: return Clock;
+    }
+  };
+	
+  // Fetch orders for modal
+  useEffect(() => {
+    if (trackOrdersOpen && user?.id) {
+      setOrdersLoading(true);
+      supabase
+        .from('orders')
+        .select('id, status, total, created_at, order_items (products (name, images)), payment_status, shipping_address')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .then(({ data, error }) => {
+          setOrders(data || []);
+          setOrdersLoading(false);
+        });
+    }
+  }, [trackOrdersOpen, user]);
 
 // Filter State
 const [filters, setFilters] = useState<FilterOptions>({
@@ -1552,34 +1610,49 @@ return (
         </>
       )}
     </main>
-    {/* Bottom Navigation */}
-    <nav className="fixed bottom-0 left-0 right-0 bg-card border-t shadow-strong safe-area-bottom-nav" role="navigation" aria-label="Main navigation">
-      <div className="flex items-center justify-around py-2">
-          {bottomNavItems.map(item => {
-            const isActive = window.location.pathname === item.path;
-            return (
-              <Button
-                key={item.path}
-                variant={isActive ? 'default' : 'ghost'}
-                size="sm"
-                className={`flex flex-col items-center px-3 py-2 h-auto ${isActive ? 'text-primary font-bold bg-green-500/30' : 'text-muted-foreground'}`}
-                onClick={() => handleNavigation(item.path)}
-                aria-label={`Navigate to ${item.label}`}
-              >
-                <div className="relative">
-                  <item.icon className="h-5 w-5 mb-1" />
-                  {item.label === "Cart" && getTotalItems() > 0 && (
-                    <Badge className="absolute -top-2 -right-2 text-xs px-1 py-0.5 rounded-full bg-primary text-white">
-                      {getTotalItems()}
-                    </Badge>
-                  )}
-                </div>
-                <span className="text-xs">{item.label}</span>
-              </Button>
-            );
-          })}
-      </div>
-    </nav>
+    <BottomNavBar />
+
+    {/* Track Orders Modal */}
+    <Dialog open={trackOrdersOpen} onOpenChange={setTrackOrdersOpen}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Track Orders</DialogTitle>
+          <DialogDescription>View and track your undelivered orders</DialogDescription>
+        </DialogHeader>
+        {ordersLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : undeliveredOrders.length === 0 ? (
+          <div className="text-center py-8">
+            <Package className="h-12 w-12 mx-auto mb-2 text-muted-foreground" />
+            <p className="text-muted-foreground">No undelivered orders to track.</p>
+          </div>
+        ) : (
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+            {undeliveredOrders.map(order => {
+              const StatusIcon = getStatusIconTrack(order.status);
+              return (
+                <Card key={order.id} className="cursor-pointer hover:shadow-lg transition-shadow">
+                  <CardContent className="p-4 flex items-center gap-4">
+                    <div className={`p-2 rounded-full ${getStatusColor(order.status)}`}> <StatusIcon className="h-6 w-6 text-white" /> </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-foreground">Order #{order.id.slice(0,8)}</h3>
+                      <p className="text-sm text-muted-foreground">{order.status.charAt(0).toUpperCase() + order.status.slice(1)}</p>
+                      <Progress value={getStatusProgress(order.status)} className="h-1 mt-2" />
+                    </div>
+                    <Button size="sm" variant="outline" onClick={() => { setTrackOrdersOpen(false); navigate(`/track-order?orderId=${order.id}`); }}>View Details</Button>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setTrackOrdersOpen(false)}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
     
     {/* Product Quick View Dialog */}
     {quickViewProduct && (
