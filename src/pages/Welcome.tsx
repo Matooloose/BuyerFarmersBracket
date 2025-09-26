@@ -911,10 +911,10 @@ const Welcome = () => {
               onMouseUp={handleSwipeEnd}
             >
               <div
-                className={`flex transition-transform duration-300 ease-in-out`}
+                className={`flex transition-transform duration-300 ease-in-out carousel-slide-track`}
                 style={{
-                  transform: `translateX(-${currentSlide * 100}%)`,
-                  width: `${slides.length * 100}%`
+                  '--carousel-translate': `-${currentSlide * 100}%`,
+                  '--carousel-width': `${slides.length * 100}%`
                 } as React.CSSProperties}
               >
                 {slides.map((slide, index) => (

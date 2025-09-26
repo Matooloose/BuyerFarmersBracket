@@ -27,6 +27,8 @@ Package,
 Eye,
 ShoppingCart
 } from "lucide-react";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 
 interface Product {
 id: string;
@@ -43,6 +45,9 @@ quantity: number;
 created_at: string;
 farmName?: string;
 farmLocation?: string;
+distance?: number;
+contactMethod?: 'email' | 'phone' | 'whatsapp';
+contactValue?: string;
 }
 
 interface Review {
@@ -63,12 +68,39 @@ const { addToCart } = useCart();
 const { wishlistItems, addToWishlist, removeFromWishlist, isInWishlist } = useWishlist();
 
 const [products, setProducts] = useState<Product[]>([]);
-const [categories, setCategories] = useState<string[]>([]);
-const [loading, setLoading] = useState(true);
-const [searchTerm, setSearchTerm] = useState('');
-const [selectedCategory, setSelectedCategory] = useState<string>('all');
-const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-const [sortBy, setSortBy] = useState<'name' | 'price' | 'rating'>('name');
+  const [categories, setCategories] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [sortBy, setSortBy] = useState<'name' | 'price' | 'rating' | 'distance'>('name');
+  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
+// Geolocation fetch
+useEffect(() => {
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setUserLocation({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+      },
+      () => setUserLocation(null),
+      { enableHighAccuracy: true }
+    );
+  }
+}, []);
+// Helper: Calculate distance (Haversine formula)
+function getDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [activeFilters, setActiveFilters] = useState<{ priceRange: [number, number]; organicOnly: boolean; featuredOnly: boolean; categories: string[] }>({ priceRange: [0, 100], organicOnly: false, featuredOnly: false, categories: [] });
 
 // Review modal state and product reviews
 const [reviewModalOpen, setReviewModalOpen] = useState(false);
@@ -79,16 +111,36 @@ const [productReviews, setProductReviews] = useState<{ [key: string]: Review[] }
 
 const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-const filteredProducts = useMemoizedSearch(
-  products,
-  debouncedSearchTerm,
-  ['name', 'description', 'farmName'] as (keyof Product)[]
-);
-
-const categoryFilteredProducts = useMemo(() => {
-  if (selectedCategory === 'all') return filteredProducts;
-  return filteredProducts.filter(product => product.category === selectedCategory);
-}, [filteredProducts, selectedCategory]);
+  // Unified filter logic
+  const filteredProducts = useMemo(() => {
+    let result = products;
+    // Search
+    if (debouncedSearchTerm) {
+      result = result.filter(product =>
+        product.name.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        (product.description || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+        (product.farmName || '').toLowerCase().includes(debouncedSearchTerm.toLowerCase())
+      );
+    }
+    // Category
+    if (selectedCategory !== 'all') {
+      result = result.filter(product => product.category === selectedCategory);
+    }
+    // Advanced filters
+    if (activeFilters.categories.length > 0) {
+      result = result.filter(product => activeFilters.categories.includes(product.category));
+    }
+    result = result.filter(product =>
+      product.price >= activeFilters.priceRange[0] && product.price <= activeFilters.priceRange[1]
+    );
+    if (activeFilters.organicOnly) {
+      result = result.filter(product => product.is_organic);
+    }
+    if (activeFilters.featuredOnly) {
+      result = result.filter(product => product.is_featured);
+    }
+    return result;
+  }, [products, debouncedSearchTerm, selectedCategory, activeFilters]);
 
 const getAverageRating = (productId: string): number => {
   const reviews = productReviews[productId] || [];
@@ -97,8 +149,8 @@ const getAverageRating = (productId: string): number => {
   return sum / reviews.length;
 };
 
-const sortedProducts = useMemo(() => {
-  return [...categoryFilteredProducts].sort((a, b) => {
+  const sortedProducts = useMemo(() => {
+    return [...filteredProducts].sort((a, b) => {
     switch (sortBy) {
       case 'price':
         return a.price - b.price;
@@ -118,7 +170,7 @@ const sortedProducts = useMemo(() => {
         return 0;
     }
   });
-}, [categoryFilteredProducts, sortBy, productReviews]);
+}, [filteredProducts, sortBy, productReviews]);
 
 const handleAddToCart = useCallback((product: Product) => {
   addToCart({
@@ -456,7 +508,29 @@ const ProductCardView = ({ product }: { product: Product }) => {
           <div className="flex items-center text-sm text-gray-600">
             <MapPin className="h-3 w-3 mr-1" />
             {product.farmName} • {product.farmLocation}
+            {typeof product.distance === 'number' && (
+              <span className="ml-2 text-xs text-blue-600">{product.distance.toFixed(1)} km away</span>
+            )}
           </div>
+          {product.contactMethod && product.contactValue && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-1"
+              onClick={e => {
+                e.stopPropagation();
+                if (product.contactMethod === 'email') {
+                  window.location.href = `mailto:${product.contactValue}`;
+                } else if (product.contactMethod === 'phone') {
+                  window.location.href = `tel:${product.contactValue}`;
+                } else if (product.contactMethod === 'whatsapp') {
+                  window.open(`https://wa.me/${product.contactValue}`);
+                }
+              }}
+            >
+              Contact Farmer
+            </Button>
+          )}
           {reviewCount > 0 && (
             <div className="flex items-center gap-1">
               <div className="flex">
@@ -560,11 +634,14 @@ return (
           Back
         </Button>
         <h1 className="text-3xl font-bold text-gray-800">Browse Products</h1>
-        <div></div>
+        <Button variant="outline" size="sm" onClick={() => setFilterDialogOpen(true)}>
+          <Grid className="h-4 w-4 mr-2" />
+          Filters
+        </Button>
       </div>
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="relative">
+        <div className="flex flex-col gap-4">
+          <div className="relative mb-2">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search products..."
@@ -573,46 +650,60 @@ return (
               className="pl-10"
             />
           </div>
-          <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-            <SelectTrigger>
-              <SelectValue placeholder="All categories" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All categories</SelectItem>
+          {/* Horizontal Category Bar */}
+          <div className="w-full overflow-x-auto pb-2">
+            <div className="flex gap-2 whitespace-nowrap">
+              <Button
+                variant={selectedCategory === 'all' ? 'default' : 'outline'}
+                size="sm"
+                className="capitalize"
+                onClick={() => setSelectedCategory('all')}
+              >
+                All
+              </Button>
               {categories.map(category => (
-                <SelectItem key={category} value={category}>
+                <Button
+                  key={category}
+                  variant={selectedCategory === category ? 'default' : 'outline'}
+                  size="sm"
+                  className="capitalize"
+                  onClick={() => setSelectedCategory(category)}
+                >
                   {category.charAt(0).toUpperCase() + category.slice(1)}
-                </SelectItem>
+                </Button>
               ))}
-            </SelectContent>
-          </Select>
-          <Select value={sortBy} onValueChange={(value: 'name' | 'price' | 'rating') => setSortBy(value)}>
-            <SelectTrigger>
-              <SelectValue placeholder="Sort by" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="name">Name</SelectItem>
-              <SelectItem value="price">Price</SelectItem>
-              <SelectItem value="rating">Rating</SelectItem>
-            </SelectContent>
-          </Select>
-          <div className="flex">
-            <Button
-              variant={viewMode === 'grid' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('grid')}
-              className="rounded-r-none"
-            >
-              <Grid className="h-4 w-4" />
-            </Button>
-            <Button
-              variant={viewMode === 'list' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setViewMode('list')}
-              className="rounded-l-none"
-            >
-              <List className="h-4 w-4" />
-            </Button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <Select value={sortBy} onValueChange={(value: 'name' | 'price' | 'rating' | 'distance') => setSortBy(value)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="name">Name</SelectItem>
+                <SelectItem value="price">Price</SelectItem>
+                <SelectItem value="rating">Rating</SelectItem>
+                <SelectItem value="distance">Distance</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="rounded-r-none"
+              >
+                <Grid className="h-4 w-4" />
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="rounded-l-none"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -635,6 +726,64 @@ return (
           ))}
         </div>
       )}
+      {/* FilterDialog integration */}
+      <Dialog open={filterDialogOpen} onOpenChange={setFilterDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Advanced Filters</DialogTitle>
+          </DialogHeader>
+          {/* Use FilterDialog component here */}
+          {/* You may want to move FilterDialog to pages or make it accept initial values */}
+          <div className="py-2">
+            {/* Inline FilterDialog logic for now */}
+            <div className="space-y-4">
+              {/* Price Range */}
+              <div>
+                <label className="text-sm font-medium">Price Range (R{activeFilters.priceRange[0]} - R{activeFilters.priceRange[1]})</label>
+                <Slider
+                  value={activeFilters.priceRange}
+                  onValueChange={value => setActiveFilters(f => ({ ...f, priceRange: [value[0], value[1]] }))}
+                  max={100}
+                  step={5}
+                  className="w-full"
+                />
+              </div>
+              {/* Categories */}
+              <div>
+                <label className="text-sm font-medium">Categories</label>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map(category => (
+                    <Badge
+                      key={category}
+                      variant={activeFilters.categories.includes(category) ? 'default' : 'outline'}
+                      className="cursor-pointer capitalize"
+                      onClick={() => setActiveFilters(f => ({
+                        ...f,
+                        categories: f.categories.includes(category)
+                          ? f.categories.filter(c => c !== category)
+                          : [...f.categories, category]
+                      }))}
+                    >
+                      {category}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+              {/* Organic Only */}
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Organic Products Only</label>
+                <Switch checked={activeFilters.organicOnly} onCheckedChange={checked => setActiveFilters(f => ({ ...f, organicOnly: checked }))} />
+              </div>
+              {/* Featured Only */}
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium">Featured Products Only</label>
+                <Switch checked={activeFilters.featuredOnly} onCheckedChange={checked => setActiveFilters(f => ({ ...f, featuredOnly: checked }))} />
+              </div>
+              <Button onClick={() => setFilterDialogOpen(false)} className="w-full mt-2">Apply Filters</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={reviewModalOpen} onOpenChange={setReviewModalOpen}>
         <DialogContent>
           <DialogHeader>

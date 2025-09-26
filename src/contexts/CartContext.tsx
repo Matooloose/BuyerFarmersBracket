@@ -9,6 +9,8 @@ export interface CartItem {
   image?: string;
   farmName?: string;
   category?: string;
+  distance?: number; // km
+  weight?: number; // kg
 }
 
 interface CartContextType {

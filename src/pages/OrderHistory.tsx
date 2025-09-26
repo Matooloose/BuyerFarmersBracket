@@ -1140,8 +1140,8 @@ const OrderHistory = () => {
                             const barHeight = Math.max(20, (month.amount / maxAmount) * 100);
                             return (
                               <div
-                                className="bg-primary/10 rounded-t"
-                                style={{ height: `${barHeight}px` }}
+                                className="bg-primary/10 rounded-t bar-chart-bar"
+                                style={{ '--bar-height': `${barHeight}px` } as React.CSSProperties}
                                 title={`${month.month}: R${month.amount.toFixed(2)}`}
                               ></div>
                             );

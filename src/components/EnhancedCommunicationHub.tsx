@@ -380,7 +380,7 @@ const EnhancedCommunicationHub: React.FC = () => {
                     onSendMessage={async (content: string, attachments?: File[], messageType?: string) => {
                       try {
                         // In real app, send message via API
-                        console.log('Sending message:', { content, attachments, messageType });
+                        // ...existing code...
                         
                         // Simulate API call
                         await new Promise(resolve => setTimeout(resolve, 1000));

@@ -26,6 +26,7 @@ import {
   Copy
 } from 'lucide-react';
 import { format } from 'date-fns';
+import InvoiceReceipt from '@/components/InvoiceReceipt';
 
 interface OrderItem {
   id: string;
@@ -495,8 +496,21 @@ const OrderConfirmation: React.FC = () => {
           </div>
         </div>
       </main>
+      {/* Printable Invoice Section */}
+      <div className="mt-12">
+        <h2 className="text-xl font-bold mb-4">Printable Invoice</h2>
+  <InvoiceReceipt order={order} user={user ? { name: user.email?.split('@')[0] || 'Customer', email: user.email } : undefined} />
+      </div>
     </div>
   );
 };
 
-export default OrderConfirmation;
+import ErrorBoundary from "../components/ErrorBoundary";
+
+const WrappedOrderConfirmation = () => (
+  <ErrorBoundary>
+    <OrderConfirmation />
+  </ErrorBoundary>
+);
+
+export default WrappedOrderConfirmation;

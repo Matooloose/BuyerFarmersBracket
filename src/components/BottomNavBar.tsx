@@ -12,7 +12,7 @@ const bottomNavItems = [
   { icon: Home, label: "Home", path: "/dashboard" },
   { icon: ShoppingCart, label: "Cart", path: "/cart" },
   { icon: Package, label: "Track", path: "/track-order" },
-  { icon: Search, label: "Browse", path: "/browse-products" },
+  { icon: Search, label: "Browse", path: "/all-farms" },
   { icon: MessageCircle, label: "Messages", path: "/messages" },
 ];
 

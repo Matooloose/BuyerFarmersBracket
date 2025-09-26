@@ -68,11 +68,49 @@ const Cart = () => {
   const [promoApplied, setPromoApplied] = useState(false);
   const [discount, setDiscount] = useState(0);
 
+  // Group cart items by farm
+  const farms = React.useMemo(() => {
+    const grouped: Record<string, typeof cartItems> = {};
+    cartItems.forEach(item => {
+      const farm = item.farmName || "Unknown Farm";
+      if (!grouped[farm]) grouped[farm] = [];
+      grouped[farm].push(item);
+    });
+    return grouped;
+  }, [cartItems]);
+
+  // Calculate subtotal per farm
+  const farmSubtotals = React.useMemo(() => {
+    const subtotals: Record<string, number> = {};
+    Object.entries(farms).forEach(([farm, items]) => {
+      subtotals[farm] = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+    });
+    return subtotals;
+  }, [farms]);
+
+  // Minimum order validation
+  const farmsBelowMinimum = Object.entries(farmSubtotals).filter(([_, subtotal]) => subtotal < 100);
+  const minimumOrderError = farmsBelowMinimum.length > 0
+    ? `Minimum order per farm is R100. Please add more items from: ${farmsBelowMinimum.map(([farm]) => farm).join(", ")}`
+    : "";
+
+  // Delivery fee logic (match Checkout.tsx)
+  const BASE_FEE = 30; // R30 covers first 5km and 5kg
+  const BASE_DISTANCE = 5; // km
+  const BASE_WEIGHT = 5; // kg
+  const DISTANCE_RATE = 5; // R5 per km over base
+  const WEIGHT_RATE = 5; // R5 per kg over base
+  const totalDistance = React.useMemo(() => cartItems.reduce((sum, item) => sum + (item.distance || 0), 0), [cartItems]);
+  const totalWeight = React.useMemo(() => cartItems.reduce((sum, item) => sum + (item.weight || 0), 0), [cartItems]);
+  const distanceFee = Math.max(0, totalDistance - BASE_DISTANCE) * DISTANCE_RATE;
+  const weightFee = Math.max(0, totalWeight - BASE_WEIGHT) * WEIGHT_RATE;
+  const deliveryFee = BASE_FEE + distanceFee + weightFee;
+
   // Memoized derived values for performance
   const totalItems = React.useMemo(() => cartItems.reduce((sum, item) => sum + item.quantity, 0), [cartItems]);
   const totalPrice = React.useMemo(() => cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0), [cartItems]);
   const promoDiscount = promoApplied ? totalPrice * discount : 0;
-  const finalTotal = React.useMemo(() => totalPrice + 2.99 - promoDiscount, [totalPrice, promoDiscount]);
+  const finalTotal = React.useMemo(() => totalPrice + deliveryFee - promoDiscount, [totalPrice, deliveryFee, promoDiscount]);
 
   // Promo code validation
   const isPromoValid = promoCode.length === 5 && /^FARM\d{2}$/.test(promoCode);
@@ -174,7 +212,7 @@ const Cart = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">Delivery Fee:</span>
-                <span>R2.99</span>
+                <span>R{deliveryFee.toFixed(2)}</span>
               </div>
               {promoApplied && (
                 <div className="flex justify-between text-sm text-green-600">
@@ -189,10 +227,17 @@ const Cart = () => {
                   R{finalTotal.toFixed(2)}
                 </span>
               </div>
+              {minimumOrderError && (
+                <div className="text-sm text-red-600 mt-2">
+                  <AlertCircle className="inline mr-1" />
+                  {minimumOrderError}
+                </div>
+              )}
             </div>
             <Button 
               className="w-full bg-gradient-to-r from-primary to-primary-light mt-2"
               onClick={() => navigate('/checkout')}
+              disabled={!!minimumOrderError}
             >
               Proceed to Checkout
             </Button>

@@ -1,3 +1,27 @@
+/* Bar chart bar for OrderHistory.tsx */
+.bar-chart-bar {
+  height: var(--bar-height, 40px);
+}
+
+/* Carousel slide track for Welcome.tsx */
+.carousel-slide-track {
+  transform: translateX(var(--carousel-translate, 0));
+  width: var(--carousel-width, 100%);
+}
+
+/* Virtualized list container/content/item for PerformantList.tsx */
+.virtualized-list-container {
+  height: var(--container-height, 400px);
+}
+.virtualized-list-content {
+  height: var(--list-total-height, 400px);
+}
+.virtualized-list-item {
+  position: absolute;
+  top: var(--item-top, 0);
+  height: var(--item-height, 40px);
+  width: 100%;
+}
 /* Performance optimized list styles */
 .virtualized-list-container {
   overflow: auto;

@@ -144,7 +144,7 @@ const AvailableFarms = () => {
                     className="w-full text-xs"
                     onClick={(e) => {
                       e.stopPropagation();
-                      navigate('/browse-products');
+                      navigate('/all-farms');
                     }}
                   >
                     View All Farms

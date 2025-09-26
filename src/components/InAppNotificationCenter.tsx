@@ -393,7 +393,7 @@ const InAppNotificationCenter: React.FC = () => {
 
     if (notification.action_url) {
       // In real app, navigate to the URL
-      console.log('Navigate to:', notification.action_url);
+  // ...existing code...
     }
   };
 
@@ -746,7 +746,7 @@ const InAppNotificationCenter: React.FC = () => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   // Open action URL
-                                  console.log('Open action:', notification.action_url);
+                                  // ...existing code...
                                 }}
                               >
                                 <ExternalLink className="h-3 w-3" />

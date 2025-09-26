@@ -12,6 +12,7 @@ import { WishlistProvider } from "./contexts/WishlistContext";
 
 // Lazy load pages for better performance
 const Index = React.lazy(() => import("./pages/Index"));
+const AllFarms = React.lazy(() => import("./pages/AllFarms"));
 const Welcome = React.lazy(() => import("./pages/Welcome"));
 const Login = React.lazy(() => import("./pages/Login"));
 const Register = React.lazy(() => import("./pages/Register"));
@@ -77,6 +78,7 @@ const App = () => (
                       <Route path="/track-order" element={<TrackOrder />} />
                       <Route path="/track-order/:orderId" element={<TrackOrder />} />
                       <Route path="/browse-products" element={<BrowseProducts />} />
+                      <Route path="/all-farms" element={<AllFarms />} />
                       <Route path="/product/:productId" element={<ProductDetail />} />
                       <Route path="/checkout" element={<Checkout />} />
                       <Route path="/profile" element={<UpdateProfile />} />

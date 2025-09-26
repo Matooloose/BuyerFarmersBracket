@@ -61,12 +61,12 @@ function VirtualizedList<T>({
       <div
         ref={scrollElementRef}
         className="virtualized-list-container"
-        style={{ height: containerHeight }}
+        style={{ '--container-height': `${containerHeight}px` } as React.CSSProperties}
         onScroll={handleScroll}
       >
         <div 
           className="virtualized-list-content"
-          style={{ height: totalHeight }}
+          style={{ '--list-total-height': `${totalHeight}px` } as React.CSSProperties}
         >
           {visibleItems.map((item: any) => (
             // eslint-disable-next-line react/forbid-dom-props
@@ -74,9 +74,9 @@ function VirtualizedList<T>({
               key={item.id || item.index}
               className="virtualized-list-item"
               style={{
-                top: item.offsetTop || (startIndex + item.index) * itemHeight,
-                height: itemHeight
-              }}
+                '--item-top': `${item.offsetTop || (startIndex + item.index) * itemHeight}px`,
+                '--item-height': `${itemHeight}px`
+              } as React.CSSProperties}
             >
               {renderItem(item, item.index)}
             </div>

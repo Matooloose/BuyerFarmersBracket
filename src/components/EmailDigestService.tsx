@@ -102,7 +102,7 @@ const EmailDigestService: React.FC = () => {
   }, [user, settings.frequency, settings.delivery_time, settings.delivery_day]);
 
   const loadDigestSettings = async () => {
-    try {
+  try {
       const savedSettings = localStorage.getItem(`digest_settings_${user?.id}`);
       if (savedSettings) {
         const parsed = JSON.parse(savedSettings);

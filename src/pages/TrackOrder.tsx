@@ -20,8 +20,10 @@ const TrackOrder = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   
-  const [order, setOrder] = useState<Order | null>(null);
+  const [order, setOrder] = useState<any>(null);
+  const [recurring, setRecurring] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [customer, setCustomer] = useState<any>(null);
 
   useEffect(() => {
     if (user && orderId) {
@@ -33,50 +35,83 @@ const TrackOrder = () => {
 
   const loadOrder = async () => {
     if (!orderId || !user?.id) return;
-    
     try {
       setLoading(true);
-      
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          order_items (
-            id,
-            quantity,
-            unit_price,
-            products (
-              id,
-              name,
-              images,
-              unit
-            )
-          )
-        `)
-        .eq('id', orderId)
-        .eq('user_id', user.id)
+      // Fetch order with items and product details
+      const { data: orderData, error: orderError } = await supabase
+        .from("orders")
+        .select(`*, order_items (*, products (id, name, description, images, price, category, farmer_id, unit))`)
+        .eq("id", orderId)
+        .eq("user_id", user.id)
         .single();
-
-      if (error) {
-        console.error('Error loading order:', error);
-        throw error;
-      }
-
-      if (data) {
-        setOrder({
-          ...data,
-          shipping_address: data.shipping_address ?? undefined,
-        });
-      } else {
+      if (orderError || !orderData) {
+        toast({ title: "Error", description: orderError?.message || "Order not found.", variant: "destructive" });
         setOrder(null);
+        setLoading(false);
+        navigate('/order-history');
+        return;
       }
+      // Fetch farm name
+      let farmName = "Unknown Farm";
+      const firstItem = orderData.order_items?.[0];
+      const farmerId = firstItem?.products?.farmer_id;
+      if (farmerId) {
+        const { data: farmData } = await supabase
+          .from("farms")
+          .select("name")
+          .eq("farmer_id", farmerId)
+          .single();
+        if (farmData?.name) farmName = farmData.name;
+      }
+      // Fetch customer profile from 'profiles' table
+      let customerObj = {
+        name: "",
+        email: user?.email || "",
+        phone: "",
+        shippingAddress: orderData.shipping_address || "",
+      };
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("name, phone")
+        .eq("id", user.id)
+        .single();
+      if (profileData) {
+        customerObj.name = profileData.name || "";
+        customerObj.phone = profileData.phone || "";
+      }
+      setCustomer(customerObj);
+      // Calculate pricing breakdown
+      const subtotal = orderData.order_items?.reduce((sum: number, item: any) => sum + (item.unit_price * item.quantity), 0) || 0;
+      const shipping = 0; // Add logic if available
+      const tax = 0; // Add logic if available
+      const discount = 0; // Add logic if available
+      const grandTotal = orderData.total || subtotal;
+      // Prepare products list
+      const products = (orderData.order_items || []).map((item: any) => ({
+        name: item.products?.name || "Unknown Product",
+        description: item.products?.description || "",
+        image: item.products?.images?.[0] || "/placeholder.svg",
+        quantity: item.quantity,
+        price: item.unit_price,
+        total: item.unit_price * item.quantity,
+        unit: item.products?.unit || "",
+      }));
+      setOrder({
+        ...orderData,
+        farmName,
+        products,
+        pricing: { subtotal, shipping, tax, discount, grandTotal },
+      });
+      // Fetch recurring order info
+      const { data: recurringData } = await supabase
+        .from('recurring_orders')
+        .select('frequency, next_delivery, is_active')
+        .eq('order_id', orderId)
+        .single();
+      if (recurringData) setRecurring(recurringData);
     } catch (error) {
       console.error('Error loading order:', error);
-      toast({
-        title: "Error",
-        description: "Failed to load order details",
-        variant: "destructive",
-      });
+      toast({ title: "Error", description: "Failed to load order details", variant: "destructive" });
       navigate('/order-history');
     } finally {
       setLoading(false);
@@ -137,7 +172,6 @@ const TrackOrder = () => {
             <h1 className="text-xl font-semibold">Track Order</h1>
           </div>
         </header>
-
         <main className="p-4">
           <Card className="text-center py-12">
             <CardContent>
@@ -180,6 +214,46 @@ const TrackOrder = () => {
       </header>
 
       <main className="p-4 space-y-6">
+        {/* Order Summary */}
+        {recurring && (
+          <Card className="mb-4">
+            <CardHeader>
+              <CardTitle>Recurring Order</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <div><strong>Frequency:</strong> {recurring.frequency}</div>
+                <div><strong>Next Delivery:</strong> {recurring.next_delivery ? new Date(recurring.next_delivery).toLocaleDateString() : 'N/A'}</div>
+                <div><strong>Status:</strong> {recurring.is_active ? 'Active' : 'Inactive'}</div>
+              </div>
+              <Button variant="outline" className="mt-3">Manage Recurring Order</Button>
+            </CardContent>
+          </Card>
+        )}
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Order Summary</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <div><strong>Order ID:</strong> {order.id}</div>
+                <div><strong>Date:</strong> {order.created_at}</div>
+                <div><strong>Status:</strong> {order.status}</div>
+                <div><strong>Payment:</strong> {order.payment_status}</div>
+                <div><strong>Farm:</strong> {order.farmName}</div>
+              </div>
+              <div>
+                <div><strong>Customer:</strong> {customer?.name}</div>
+                <div><strong>Email:</strong> {customer?.email}</div>
+                <div><strong>Phone:</strong> {customer?.phone}</div>
+                <div><strong>Shipping Address:</strong> {customer?.shippingAddress}</div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tracking Progress */}
         <Card>
           <CardHeader className="text-center">
             <div className="flex items-center justify-center mb-4">
@@ -217,7 +291,7 @@ const TrackOrder = () => {
               <MapPin className="h-5 w-5 text-primary mt-0.5" />
               <div>
                 <p className="font-medium">Delivery Address</p>
-                <p className="text-sm text-muted-foreground">{order.shipping_address || 'No address provided'}</p>
+                <p className="text-sm text-muted-foreground">{customer?.shippingAddress || 'No address provided'}</p>
                 {order.delivery_instructions && (
                   <p className="text-sm text-muted-foreground mt-1">
                     Instructions: {order.delivery_instructions}
@@ -226,68 +300,106 @@ const TrackOrder = () => {
               </div>
             </div>
 
-            {order.phone_number && (
+            {customer?.phone && (
               <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
                 <Phone className="h-5 w-5 text-primary" />
                 <div>
                   <p className="font-medium">Contact Number</p>
-                  <p className="text-sm text-muted-foreground">{order.phone_number}</p>
+                  <p className="text-sm text-muted-foreground">{customer.phone}</p>
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
-        <Card>
+        {/* Products */}
+        <Card className="mb-4">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <ShoppingCart className="h-5 w-5" />
-              Order Items
-            </CardTitle>
+            <CardTitle>Products</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              {order.order_items?.map((item) => (
-                item.products ? (
-                  <div key={item.id} className="flex items-center gap-4 p-3 border rounded-lg">
-                    <img 
-                      src={item.products.images?.[0] || "/placeholder.svg"} 
-                      alt={item.products.name}
-                      className="w-16 h-16 object-cover rounded-lg"
-                    />
-                    <div className="flex-1">
-                      <h4 className="font-medium">{item.products.name}</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {item.quantity} {item.products.unit} × R{item.unit_price.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">R{(item.quantity * item.unit_price).toFixed(2)}</p>
-                    </div>
-                  </div>
-                ) : (
-                  <div key={item.id} className="flex items-center gap-4 p-3 border rounded-lg">
-                    <div className="flex-1">
-                      <h4 className="font-medium">Unknown Product</h4>
-                      <p className="text-sm text-muted-foreground">
-                        {item.quantity} × R{item.unit_price.toFixed(2)}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium">R{(item.quantity * item.unit_price).toFixed(2)}</p>
-                    </div>
-                  </div>
-                )
-              ))}
-              <Separator />
-              <div className="flex justify-between items-center text-lg font-semibold">
-                <span>Total</span>
-                <span>R{order.total.toFixed(2)}</span>
-              </div>
+            <table className="w-full text-sm">
+              <thead>
+                <tr>
+                  <th className="text-left">Product</th>
+                  <th>Description</th>
+                  <th>Qty</th>
+                  <th>Unit Price</th>
+                  <th>Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {order.products.map((p: any, idx: number) => (
+                  <tr key={idx}>
+                    <td className="flex items-center gap-2">
+                      {p.image && <img src={p.image} alt={p.name} className="w-10 h-10 rounded" />}
+                      {p.name}
+                    </td>
+                    <td>{p.description}</td>
+                    <td>{p.quantity}</td>
+                    <td>R{p.price.toFixed(2)}</td>
+                    <td>R{p.total.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+
+        {/* Pricing Breakdown */}
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Pricing Breakdown</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-1">
+              <div><strong>Subtotal:</strong> R{order.pricing.subtotal.toFixed(2)}</div>
+              <div><strong>Shipping:</strong> R{order.pricing.shipping.toFixed(2)}</div>
+              <div><strong>Tax:</strong> R{order.pricing.tax.toFixed(2)}</div>
+              <div><strong>Discount:</strong> -R{order.pricing.discount.toFixed(2)}</div>
+              <div className="font-bold"><strong>Grand Total:</strong> R{order.pricing.grandTotal.toFixed(2)}</div>
             </div>
           </CardContent>
         </Card>
 
+        {/* Shipping & Delivery */}
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Shipping & Delivery</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div><strong>Method:</strong> {order.payment_method || ''}</div>
+            <div><strong>Estimated Delivery:</strong> {order.updated_at || ''}</div>
+          </CardContent>
+        </Card>
+
+        {/* Payment Details */}
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Payment Details</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div><strong>Method:</strong> {order.payment_method_selected || order.payment_method || ''}</div>
+            <div><strong>Confirmation:</strong> {order.payment_status || ''}</div>
+          </CardContent>
+        </Card>
+
+        {/* Actions */}
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Actions</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex gap-2">
+              {(order.status === "pending" || order.status === "processing") && <Button variant="outline">Cancel Order</Button>}
+              {order.status === "delivered" && <Button variant="outline">Request Return</Button>}
+              {order.status === "delivered" && <Button variant="outline">Request Refund</Button>}
+              <Button variant="default" onClick={() => window.print()}>Print Invoice</Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Help & Navigation */}
         <Card>
           <CardHeader>
             <CardTitle>Need Help?</CardTitle>
@@ -326,11 +438,10 @@ const TrackOrder = () => {
           </Button>
         </div>
 
-      {/* Bottom Navigation Bar */}
-      <div>
-        {/* ...existing code... */}
-        <BottomNavBar />
-      </div>
+        {/* Bottom Navigation Bar */}
+        <div>
+          <BottomNavBar />
+        </div>
       </main>
     </div>
   );
