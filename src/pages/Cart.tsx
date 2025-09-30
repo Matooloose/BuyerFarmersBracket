@@ -40,6 +40,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
 import { ScrollArea } from "../components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "../contexts/CartContext";
+<<<<<<< HEAD
 import { useAuth } from "../contexts/AuthContext";
 import { useToast } from "../hooks/use-toast";
 import { supabase } from "../integrations/supabase/client";
@@ -55,6 +56,9 @@ interface SmartSuggestion {
   confidence: number;
   bundleDiscount?: number;
 }
+=======
+import BottomNav from "@/components/BottomNav";
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
 
 const Cart = () => {
   // ...all Cart logic and hooks...
@@ -241,10 +245,19 @@ const Cart = () => {
             >
               Proceed to Checkout
             </Button>
+<<<<<<< HEAD
           </>
         )}
       </div>
       <BottomNavBar />
+=======
+          </div>
+        </div>
+      )}
+
+      {/* Shared Bottom Navigation */}
+      <BottomNav />
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
     </div>
   );
 }

@@ -47,6 +47,7 @@ const OrderConfirmation = React.lazy(() => import("./pages/OrderConfirmation"));
 
 const queryClient = new QueryClient();
 
+<<<<<<< HEAD
 const App = () => {
   const navigate = useNavigate();
   useEffect(() => {
@@ -132,4 +133,41 @@ const App = () => {
 
 export default App;
 
+=======
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <AuthProvider>
+        <AppStateProvider>
+          <CartProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/" element={<Login />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/register" element={<Register />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+               <Route path="/home" element={<Dashboard />} />
+               <Route path="/" element={<Dashboard />} />
+              <Route path="/cart" element={<Cart />} />
+              <Route path="/track-order" element={<TrackOrder />} />
+              <Route path="/browse-products" element={<BrowseProducts />} />
+              <Route path="/checkout" element={<Checkout />} />
+              <Route path="/profile" element={<UpdateProfile />} />
+              <Route path="/update-profile" element={<UpdateProfile />} />
+              <Route path="/subscriptions" element={<Subscriptions />} />
+              <Route path="/messages" element={<Messages />} />
+              <Route path="/farmer/:id" element={<FarmerProfile />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+          </CartProvider>
+        </AppStateProvider>
+      </AuthProvider>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
 

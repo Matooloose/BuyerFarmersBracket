@@ -21,7 +21,11 @@ interface FarmerProfile {
   image_url?: string;
 }
 
-const AvailableFarms = () => {
+interface AvailableFarmsProps {
+  searchQuery?: string;
+}
+
+const AvailableFarms = ({ searchQuery = "" }: AvailableFarmsProps) => {
   const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
   const [farmerProfiles, setFarmerProfiles] = useState<Record<string, FarmerProfile>>({});
@@ -67,6 +71,11 @@ const AvailableFarms = () => {
     fetchFarms();
   }, []);
 
+<<<<<<< HEAD
+=======
+  // Auto-scroll removed: no interval or scrollIntoView logic
+
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
   const handleFarmClick = (farm: Farm) => {
     navigate(`/farmer/${farm.farmer_id}`);
   };
@@ -93,6 +102,18 @@ const AvailableFarms = () => {
     );
   }
 
+  // Filter farms by search query (robust)
+  const filteredFarms = farms.filter(farm => {
+    const q = (searchQuery || "").toLowerCase().trim();
+    if (!q) return true;
+    return (
+      (farm.name && farm.name.toLowerCase().includes(q)) ||
+      (farm.description && farm.description.toLowerCase().includes(q)) ||
+      (farm.address && farm.address.toLowerCase().includes(q)) ||
+      (farm.location && farm.location.toLowerCase().includes(q))
+    );
+  });
+
   return (
     <Card>
       <CardHeader>
@@ -100,6 +121,7 @@ const AvailableFarms = () => {
         <CardDescription>Fresh produce from local farms</CardDescription>
       </CardHeader>
       <CardContent className="w-full overflow-x-auto">
+<<<<<<< HEAD
         <div className="whitespace-nowrap flex gap-6 pb-4 relative farm-scroll-container w-max px-2">
           {farms.map((farm, index) => (
             <div
@@ -149,11 +171,43 @@ const AvailableFarms = () => {
                   >
                     View All Farms
                   </Button>
+=======
+        {filteredFarms.length === 0 ? (
+          <div className="p-4 text-center text-muted-foreground">No farms match your search.</div>
+        ) : (
+          <div ref={scrollRef} className="whitespace-nowrap flex gap-4 pb-2 relative farm-scroll-container w-max">
+            {filteredFarms.map((farm) => (
+              <div
+                key={farm.id}
+                className="inline-block min-w-[240px] max-w-xs bg-card border rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer align-top farm-scroll-card"
+                onClick={() => handleFarmClick(farm)}
+              >
+                <div className="w-full h-28 bg-primary/10 rounded-t-lg flex items-center justify-center overflow-hidden">
+                  {farmerProfiles[farm.farmer_id]?.image_url ? (
+                    <img
+                      src={farmerProfiles[farm.farmer_id].image_url}
+                      alt={farm.name}
+                      className="w-full h-full object-cover rounded-t-lg"
+                    />
+                  ) : (
+                    <Leaf className="h-10 w-10 text-primary" />
+                  )}
+                </div>
+                <div className="p-4">
+                  <h4 className="font-semibold text-lg text-foreground truncate mb-1">{farm.name}</h4>
+                  {farm.address && (
+                    <p className="text-xs text-muted-foreground mb-1"><span className="font-medium">Address:</span> {farm.address}</p>
+                  )}
+                  {farm.location && (
+                    <p className="text-xs text-muted-foreground mb-1"><span className="font-medium">Location:</span> {farm.location}</p>
+                  )}
+                  <p className="text-sm text-muted-foreground line-clamp-2">{farm.description || "No bio available."}</p>
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

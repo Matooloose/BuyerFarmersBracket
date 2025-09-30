@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+<<<<<<< HEAD
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +23,23 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
+=======
+import { ArrowLeft, Camera, User, Key, Trash2, Download, Bell, LogOut } from "lucide-react";
+import { Sun } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { supabase } from "@/integrations/supabase/client"; 
+import BottomNav from "@/components/BottomNav";
+
+export default function UpdateProfileWrapper() {
+  return (
+    <>
+      <UpdateProfile />
+      <BottomNav />
+    </>
+  );
+}
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
 
 // Enhanced interfaces for comprehensive profile management
 interface ProfileData {
@@ -112,6 +130,29 @@ interface DataExportOption {
 }
 
 const UpdateProfile = () => {
+<<<<<<< HEAD
+=======
+  // Handler for dark mode toggle
+  const handleDarkModeChange = (checked: boolean) => {
+    setDarkMode(checked);
+    if (checked) {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  // Handler for notifications toggle
+  const handleNotificationsChange = (checked: boolean) => {
+    setNotifications(checked);
+    localStorage.setItem('notifications', checked ? 'true' : 'false');
+  };
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [showPolicies, setShowPolicies] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user } = useAuth();
@@ -163,6 +204,8 @@ const UpdateProfile = () => {
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [darkMode, setDarkMode] = useState(false);
+  const [notifications, setNotifications] = useState(false);
 
   // Dialog states
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -650,6 +693,7 @@ const UpdateProfile = () => {
                   {profileCompleteness.score}% Complete
                 </Badge>
               </div>
+<<<<<<< HEAD
               
               <Progress value={profileCompleteness.score} className="h-2" />
               
@@ -667,6 +711,234 @@ const UpdateProfile = () => {
                         </div>
                       ))
                     }
+=======
+
+              <div>
+                <Label htmlFor="email" className="text-foreground">Email</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={profileData.email ?? ""}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  placeholder="Enter your email"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="phone" className="text-foreground">Phone Number</Label>
+                <Input
+                  id="phone"
+                  value={profileData.phone ?? ""}
+                  onChange={(e) => handleInputChange('phone', e.target.value)}
+                  placeholder="Enter your phone number"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="location" className="text-foreground">Location</Label>
+                <Input
+                  id="location"
+                  value={profileData.location ?? ""}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
+                  placeholder="Enter your city/area"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="address" className="text-foreground">Full Address</Label>
+                <Textarea
+                  id="address"
+                  value={profileData.address ?? ""}
+                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  placeholder="Enter your complete address for deliveries"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="bio" className="text-foreground">Bio</Label>
+                <Textarea
+                  id="bio"
+                  value={profileData.bio}
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                  placeholder="Tell us about yourself"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <Button 
+              onClick={handleSave} 
+              disabled={loading} 
+              className="w-full"
+            >
+              {loading ? 'Saving...' : 'Save Profile'}
+            </Button>
+
+            {/* Settings & Notifications (moved from drawer) */}
+            <div className="mt-8 space-y-4">
+              <h2 className="font-semibold text-lg">Settings</h2>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  {darkMode ? <Key className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+                  <Label htmlFor="dark-mode">Dark Mode</Label>
+                </div>
+                <input
+                  id="dark-mode"
+                  type="checkbox"
+                  checked={darkMode}
+                  onChange={e => handleDarkModeChange(e.target.checked)}
+                  title="Toggle dark mode"
+                  aria-label="Toggle dark mode"
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <Bell className="h-4 w-4" />
+                  <Label htmlFor="notifications">Notifications</Label>
+                </div>
+                <input
+                  id="notifications"
+                  type="checkbox"
+                  checked={notifications}
+                  onChange={e => handleNotificationsChange(e.target.checked)}
+                  title="Toggle notifications"
+                  aria-label="Toggle notifications"
+                />
+              </div>
+            </div>
+
+            {/* Logout (moved from drawer) */}
+            <div className="mt-8">
+              <Button 
+                variant="destructive" 
+                className="w-full justify-start"
+                onClick={() => setDeleteDialogOpen(true)}
+              >
+                <LogOut className="h-4 w-4 mr-3" />
+                Logout
+              </Button>
+              <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Are you sure you want to logout?</DialogTitle>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>
+                      No
+                    </Button>
+                    <Button variant="destructive" onClick={() => {/* add your logout logic here */}}>
+                      Yes
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {/* Communication Preferences */}
+            <div className="mt-8 space-y-2">
+              <h2 className="font-semibold text-lg">Communication Preferences</h2>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={profileData.email_opt_in} onChange={e => handleInputChange('email_opt_in', e.target.checked ? true : false)} />
+                  <span>Email Updates</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="checkbox" checked={profileData.sms_opt_in} onChange={e => handleInputChange('sms_opt_in', e.target.checked ? true : false)} />
+                  <span>SMS Updates</span>
+                </label>
+              </div>
+            </div>
+
+            {/* Change Password Section */}
+            <div className="mt-8 space-y-2">
+              <h2 className="font-semibold text-lg flex items-center gap-2"><Key className="h-5 w-5" /> Change Password</h2>
+              <div className="space-y-2">
+                <Input type="password" placeholder="Current Password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+                <Input type="password" placeholder="New Password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                <Input type="password" placeholder="Confirm New Password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} />
+                <Button onClick={handleChangePassword} disabled={changePwLoading || !newPassword || newPassword !== confirmNewPassword} className="w-full mt-2">{changePwLoading ? 'Changing...' : 'Change Password'}</Button>
+              </div>
+            </div>
+
+            {/* Download/Delete Data Section */}
+            <div className="mt-8 space-y-2">
+              <h2 className="font-semibold text-lg">Account & Data</h2>
+              <div className="flex gap-4">
+                <Button variant="outline" onClick={handleDownloadData} className="flex items-center gap-2"><Download className="h-4 w-4" /> Download My Data</Button>
+                <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleteLoading} className="flex items-center gap-2"><Trash2 className="h-4 w-4" /> Delete My Account</Button>
+                <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Are you sure you want to delete your account?</DialogTitle>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setDeleteDialogOpen(false)} disabled={deleteLoading}>
+                        Cancel
+                      </Button>
+                      <Button variant="destructive" onClick={handleDeleteAccount} disabled={deleteLoading}>
+                        {deleteLoading ? "Deleting..." : "Yes, Delete My Account"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+              </div>
+            </div>
+            {/* System Settings Section */}
+            <div className="mt-8 space-y-4">
+              <h2 className="font-semibold text-lg">System Settings</h2>
+              {/* Location Access */}
+              <div className="flex items-center gap-2">
+                <Label className="font-medium">Location Access</Label>
+                <Button variant="outline" onClick={async () => {
+                  if (navigator.geolocation) {
+                    navigator.geolocation.getCurrentPosition(
+                      (pos) => {
+                        const { latitude, longitude } = pos.coords;
+                        toast({ title: 'Location Accessed', description: `Lat: ${latitude}, Lng: ${longitude}` });
+                        handleInputChange('location', `${latitude},${longitude}`);
+                      },
+                      () => toast({ title: 'Error', description: 'Location access denied.', variant: 'destructive' })
+                    );
+                  } else {
+                    toast({ title: 'Error', description: 'Geolocation not supported.', variant: 'destructive' });
+                  }
+                }}>Get Location</Button>
+              </div>
+              {/* Push Notifications */}
+              <div className="flex items-center gap-2">
+                <Label className="font-medium">Push Notifications</Label>
+                <input type="checkbox" checked={profileData.push_opt_in ?? false} onChange={e => handleInputChange('push_opt_in', e.target.checked)} title="Enable push notifications" />
+                <span>{profileData.push_opt_in ? 'Enabled' : 'Disabled'}</span>
+              </div>
+              {/* Cache Clearing */}
+              <div className="flex items-center gap-2">
+                <Label className="font-medium">Clear Cache</Label>
+                <Button variant="outline" onClick={() => {
+                  if ('caches' in window) {
+                    caches.keys().then(keys => keys.forEach(key => caches.delete(key)));
+                    toast({ title: 'Cache Cleared', description: 'App cache has been cleared.' });
+                  } else {
+                    toast({ title: 'Error', description: 'Cache API not supported.', variant: 'destructive' });
+                  }
+                }}>Clear</Button>
+              </div>
+              {/* Policies Display */}
+              <div className="flex flex-col gap-2">
+                <Label className="font-medium">Policies</Label>
+                <Button variant="outline" onClick={() => setShowPolicies(true)}>View Policies</Button>
+                {showPolicies && (
+                  <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+                    <div className="bg-white rounded-lg p-6 w-full max-w-lg shadow-lg">
+                      <h3 className="text-lg font-bold mb-2">App Policies</h3>
+                      <div className="mb-4 text-sm max-h-64 overflow-y-auto">
+                        <p><strong>Privacy Policy:</strong> We respect your privacy. Your data is stored securely and never shared without consent.</p>
+                        <p className="mt-2"><strong>Terms of Service:</strong> By using this app, you agree to our terms and conditions. For details, contact support.</p>
+                        <p className="mt-2"><strong>Refund Policy:</strong> Refunds are processed according to our payment provider's terms.</p>
+                      </div>
+                      <Button variant="outline" onClick={() => setShowPolicies(false)}>Close</Button>
+                    </div>
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
                   </div>
                 </div>
               )}
@@ -1440,5 +1712,3 @@ const UpdateProfile = () => {
     </div>
   );
 };
-
-export default UpdateProfile;

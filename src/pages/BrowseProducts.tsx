@@ -9,10 +9,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useCart } from "@/contexts/CartContext";
+<<<<<<< HEAD
 import { useWishlist } from "@/contexts/WishlistContext";
 import { useMemoizedSearch, useDebounce } from "@/hooks/usePerformance";
 import { supabase } from "@/integrations/supabase/client";
 import {
+=======
+import { Badge } from "@/components/ui/badge";
+import BottomNav from "@/components/BottomNav";
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
 
 ArrowLeft,
 Search,
@@ -706,6 +711,7 @@ return (
             </div>
           </div>
         </div>
+<<<<<<< HEAD
       </div>
       {sortedProducts.length === 0 ? (
         <div className="text-center py-20">
@@ -827,6 +833,160 @@ return (
           </div>
         </DialogContent>
       </Dialog>
+=======
+      </header>
+
+      {/* Main Content */}
+      <main className="p-4 pb-20">
+        {loading ? (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">Loading products...</p>
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-16">
+            <Search className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">No products found</h2>
+            <p className="text-muted-foreground">Try adjusting your search or category filter</p>
+          </div>
+        ) : (
+          <div className={`${
+            viewMode === 'grid' 
+              ? 'grid grid-cols-2 gap-4' 
+              : 'space-y-4'
+          }`}>
+            {productsToShow.map((product) => (
+              <Card key={product.id} className="overflow-hidden relative">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 z-10"
+                  onClick={() => toggleWishlist(product.id)}
+                  aria-label={wishlist.includes(product.id) ? "Remove from wishlist" : "Add to wishlist"}
+                >
+                  <Heart className={`h-5 w-5 ${wishlist.includes(product.id) ? 'text-primary' : 'text-muted-foreground'}`} />
+                </Button>
+                {viewMode === 'grid' ? (
+                  <>
+                    <div className="aspect-square bg-gradient-to-br from-primary/5 to-primary/10 flex items-center justify-center">
+                      {product.images.length > 0 ? (
+                        <img 
+                          src={product.images[0]} 
+                          alt={product.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <Package className="h-12 w-12 text-primary/40" />
+                      )}
+                    </div>
+                    <CardContent className="p-3">
+                      <div className="space-y-2">
+                        <div className="flex items-start justify-between">
+                          <h3 className="font-semibold text-sm text-foreground line-clamp-1">
+                            {product.name}
+                          </h3>
+                          {product.is_organic && (
+                            <Badge variant="secondary" className="text-xs">
+                              Organic
+                            </Badge>
+                          )}
+                        </div>
+                        
+                        <p className="text-xs text-muted-foreground line-clamp-2">
+                          {product.description}
+                        </p>
+                        
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-primary">
+                              R{product.price}/{product.unit}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {product.quantity} {product.unit} available
+                            </p>
+                          </div>
+                          <Button 
+                            size="sm" 
+                            className="h-8 w-8 p-0"
+                            onClick={() => addProductToCart(product.id)}
+                            disabled={addedProductId === product.id}
+                          >
+                            {addedProductId === product.id ? (
+                              <Check className="h-4 w-4 text-success" />
+                            ) : (
+                              <Plus className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </>
+                ) : (
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-4">
+                      <div className="w-20 h-20 bg-gradient-to-br from-primary/5 to-primary/10 rounded-lg flex items-center justify-center">
+                        {product.images.length > 0 ? (
+                          <img 
+                            src={product.images[0]} 
+                            alt={product.name}
+                            className="w-full h-full object-cover rounded-lg"
+                          />
+                        ) : (
+                          <Package className="h-6 w-6 text-primary/40" />
+                        )}
+                      </div>
+                      
+                      <div className="flex-1 space-y-1">
+                        <div className="flex items-start justify-between">
+                          <h3 className="font-semibold text-foreground">{product.name}</h3>
+                          {product.is_organic && (
+                            <Badge variant="secondary" className="text-xs">
+                              Organic
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {product.description}
+                        </p>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="font-semibold text-primary">
+                              R{product.price}/{product.unit}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {product.quantity} {product.unit} available
+                            </p>
+                          </div>
+                          <Button 
+                            size="sm"
+                            onClick={() => addProductToCart(product.id)}
+                            disabled={addedProductId === product.id}
+                          >
+                            {addedProductId === product.id ? (
+                              <>
+                                <Check className="h-4 w-4 mr-1 text-success" />
+                                Added
+                              </>
+                            ) : (
+                              <>
+                                <Plus className="h-4 w-4 mr-1" />
+                                Add to Cart
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+      </main>
+
+      {/* Shared Bottom Navigation */}
+      <BottomNav />
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
     </div>
   </div>
 );

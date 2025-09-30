@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+<<<<<<< HEAD
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import BottomNavBar from "@/components/BottomNavBar";
@@ -30,6 +31,9 @@ import {
   Settings
 } from "lucide-react";
 import { useCart } from "@/contexts/CartContext";
+=======
+import BottomNav from "@/components/BottomNav";
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/contexts/AppStateContext";
 import { format, isToday, isYesterday } from "date-fns";
@@ -603,6 +607,7 @@ const Messages: React.FC = () => {
             </Card>
           </>
         )}
+<<<<<<< HEAD
       </main>
 
       {/* Settings Dialog */}
@@ -640,6 +645,11 @@ const Messages: React.FC = () => {
 
       {/* Bottom Navigation */}
       <BottomNavBar />
+=======
+      </div>
+      {/* Shared Bottom Navigation */}
+      <BottomNav />
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
     </div>
   );
 };

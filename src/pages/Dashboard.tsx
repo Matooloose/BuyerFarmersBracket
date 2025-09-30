@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { fadeIn } from "@/lib/animations";
@@ -7,6 +8,25 @@ import {
   ShoppingCart,
   Package,
   MessageCircle,
+=======
+import React, { useState } from "react";
+import { useLocation } from "react-router-dom";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { Separator } from "@/components/ui/separator";
+import { 
+  Menu, 
+  Home, 
+  ShoppingCart, 
+  Package, 
+  MessageCircle, 
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
   Search,
   User,
   Moon,
@@ -66,13 +86,18 @@ import { useNetworkStatus } from "@/hooks/useNetworkStatus.capacitor";
 import { useCapacitorLocation } from "@/hooks/useCapacitorLocation";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import { NotificationIcon } from "@/components/NotificationIcon";
+<<<<<<< HEAD
 import AdvancedFilters, { FilterOptions } from "@/components/AdvancedFilters";
 import { ProductCardSkeleton, ProductListSkeleton, QuickActionSkeleton } from "@/components/SkeletonLoaders";
 import ProductQuickView from "@/components/ProductQuickView";
+=======
+import BottomNav from "@/components/BottomNav";
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
 import AvailableFarms from "@/components/AvailableFarms";
 import PullToRefreshIndicator from "@/components/PullToRefreshIndicator";
 import { ProductRating } from "@/components/ProductRating";
 
+<<<<<<< HEAD
 import BottomNavBar from "@/components/BottomNavBar";
 
 interface Product {
@@ -187,6 +212,17 @@ const [recentOrdersCollapsed, setRecentOrdersCollapsed] = useState(true);
       case 'delivered': return 100;
       case 'cancelled': return 0;
       default: return 25;
+=======
+const Dashboard = () => {
+  const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
+  const location = useLocation();
+  const [searchQuery, setSearchQuery] = useState("");
+  const navigate = useNavigate();
+  const { signOut, user } = useAuth();
+  const [darkMode, setDarkMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('theme') === 'dark';
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
     }
   };
   const getStatusColor = (status: string) => {
@@ -633,6 +669,7 @@ const handleLogout = async () => {
   navigate('/login');
 };
 
+<<<<<<< HEAD
 const handleNotificationsChange = (value: boolean) => {
   setNotifications(value);
   localStorage.setItem('notifications', value ? 'true' : 'false');
@@ -871,6 +908,18 @@ useEffect(() => {
         opacity={Math.min(pullToRefresh.pullDistance / 80, 1)}
       />
       
+=======
+  const bottomNavItems = [
+  { icon: Home, label: "Home", path: "/home" },
+  { icon: ShoppingCart, label: "Cart", path: "/cart" },
+  { icon: Package, label: "Track", path: "/track-order" },
+  { icon: Search, label: "Browse", path: "/browse-products" },
+  { icon: User, label: "Profile", path: "/profile" },
+];
+
+  return (
+  <div className="min-h-screen bg-background overflow-visible">
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
       {/* Top App Bar */}
       <header className="sticky top-0 z-50 bg-card border-b shadow-soft" role="banner">
         <div className="flex items-center justify-between px-4 py-3">
@@ -898,6 +947,7 @@ useEffect(() => {
                     </div>
                   </div>
                 </SheetHeader>
+<<<<<<< HEAD
                 <ScrollArea className="h-[calc(100vh-4rem)] pr-2">
                   <div className="mt-8 space-y-6">
                     {/* Profile */}
@@ -971,6 +1021,14 @@ useEffect(() => {
                     </Dialog>
                   </div>
                 </ScrollArea>
+=======
+
+                <div className="mt-8 space-y-6">
+                  {/* Profile Section removed as requested */}
+
+                  {/* Settings, Notifications, and Logout moved to Profile */}
+                </div>
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
               </SheetContent>
             </Sheet>
           <div>
@@ -997,6 +1055,7 @@ useEffect(() => {
         </div>
       </div>
 
+<<<<<<< HEAD
       {/* Filters */}
       <div className="px-4 pb-4">
         <AdvancedFilters
@@ -1029,6 +1088,53 @@ useEffect(() => {
               <div className="flex items-center gap-2 bg-muted rounded-lg p-1">
                 <div className="h-8 w-8 bg-muted-foreground/20 rounded animate-pulse" />
                 <div className="h-8 w-8 bg-muted-foreground/20 rounded animate-pulse" />
+=======
+      {/* Main Content */}
+  <main className="p-4 pb-20 space-y-6" style={{ marginBottom: 'env(safe-area-inset-bottom, 32px)' }}>
+        {/* Welcome Card */}
+        <Card className="bg-gradient-to-r from-primary to-primary-light text-primary-foreground">
+          <CardHeader>
+            <CardTitle>Welcome to FarmersBracket!</CardTitle>
+            <CardDescription className="text-primary-foreground/80">
+              Discover fresh produce from local farms
+            </CardDescription>
+          </CardHeader>
+        </Card>
+
+                        {/* Search Bar Under App Bar */}
+                        <div className="w-full px-4 py-3 bg-background border-b flex items-center gap-2">
+                          <Search className="h-5 w-5 text-muted-foreground" />
+                          <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            placeholder="Search farms, products..."
+                            className="w-full p-2 rounded-md border bg-card text-foreground focus:outline-none focus:ring focus:border-primary"
+                          />
+                        </div>
+
+  {/* Available Farms */}
+  <AvailableFarms searchQuery={searchQuery} />
+
+        {/* Blog Posts/Updates */}
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle>Farmers Blog & Updates</CardTitle>
+            <CardDescription>Latest news, tips, and updates from your favorite farmers.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {/* Example blog posts, replace with dynamic fetch if needed */}
+              <div className="border rounded p-3">
+                <h4 className="font-semibold mb-1">How to Store Fresh Produce</h4>
+                <p className="text-sm text-muted-foreground">Learn best practices for keeping your veggies fresh longer.</p>
+                <span className="text-xs text-info">Posted by Farmer Joe · 2 days ago</span>
+              </div>
+              <div className="border rounded p-3">
+                <h4 className="font-semibold mb-1">Organic Farming Benefits</h4>
+                <p className="text-sm text-muted-foreground">Discover why organic farming is better for you and the planet.</p>
+                <span className="text-xs text-info">Posted by Green Acres · 5 days ago</span>
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -1190,6 +1296,7 @@ useEffect(() => {
             </section>
           )}
 
+<<<<<<< HEAD
           {/* Personalized Farms Section */}
           {personalizedFarms.length > 0 && (
             <section className="space-y-4">
@@ -1710,6 +1817,11 @@ useEffect(() => {
     )}
       </motion.div>
     </ErrorBoundary>
+=======
+      {/* Shared Bottom Navigation */}
+      <BottomNav />
+    </div>
+>>>>>>> aeb7aacc8daba24402f7cfa7daf6ee404e6afaef
   );
 };
 
