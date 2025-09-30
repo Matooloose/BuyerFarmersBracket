@@ -325,9 +325,10 @@ const Wishlist = () => {
       switch (sortBy) {
         case 'price':
           return a.price - b.price;
-        case 'priority':
+        case 'priority': {
           const priorityOrder = { 'high': 3, 'medium': 2, 'low': 1 };
           return priorityOrder[b.priority] - priorityOrder[a.priority];
+        }
         case 'name':
           return a.name.localeCompare(b.name);
         case 'date':

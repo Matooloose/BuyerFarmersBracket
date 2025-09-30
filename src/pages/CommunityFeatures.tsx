@@ -102,7 +102,7 @@ interface ForumCategory {
   id: string;
   name: string;
   description: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   color: string;
   posts_count: number;
 }
@@ -286,7 +286,7 @@ const CommunityFeatures: React.FC = () => {
       </header>
 
       <main className="container mx-auto px-4 py-6 max-w-7xl">
-        <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)}>
+        <Tabs value={activeTab} onValueChange={(value: string) => setActiveTab(value as 'forum' | 'events' | 'groups')}>
           <TabsList className="grid w-full grid-cols-3 max-w-md">
             <TabsTrigger value="forum" className="flex items-center gap-2">
               <MessageSquare className="h-4 w-4" />
@@ -353,7 +353,7 @@ const CommunityFeatures: React.FC = () => {
                   </div>
                   
                   <div className="flex gap-2">
-                    <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+                    <Select value={sortBy} onValueChange={(value: 'latest' | 'popular' | 'trending') => setSortBy(value)}>
                       <SelectTrigger className="w-32">
                         <SelectValue />
                       </SelectTrigger>
@@ -364,7 +364,7 @@ const CommunityFeatures: React.FC = () => {
                       </SelectContent>
                     </Select>
 
-                    <Select value={filterBy} onValueChange={(value: any) => setFilterBy(value)}>
+                    <Select value={filterBy} onValueChange={(value: 'all' | 'unanswered' | 'solved') => setFilterBy(value)}>
                       <SelectTrigger className="w-36">
                         <SelectValue />
                       </SelectTrigger>

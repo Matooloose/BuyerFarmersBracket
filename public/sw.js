@@ -21,10 +21,18 @@ self.addEventListener('fetch', function(event) {
   event.respondWith(
     caches.match(event.request)
       .then(function(response) {
-        // Return cached version or fetch from network
-        return response || fetch(event.request);
-      }
-    )
+        // Return cached version or fetch from network, with error handling
+        return response || fetch(event.request)
+          .catch(function(error) {
+            // Optionally, return a fallback response or a custom error page
+            // For now, return a simple Response indicating offline or error
+            return new Response('Network error occurred', {
+              status: 503,
+              statusText: 'Service Unavailable',
+              headers: { 'Content-Type': 'text/plain' }
+            });
+          });
+      })
   );
 });
 

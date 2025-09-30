@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redirecting to App...</title>
+  <style>
+    body { font-family: sans-serif; text-align: center; padding-top: 60px; }
+    .spinner { margin: 30px auto; width: 40px; height: 40px; border: 4px solid #ccc; border-top: 4px solid #4caf50; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <h2>Redirecting to FarmersBracket App...</h2>
+  <div class="spinner"></div>
+  <p>If you are not redirected automatically, <a id="deeplink" href="farmersbracket://payment-success">tap here</a>.</p>
+  <script>
+    setTimeout(function() {
+      window.location = 'farmersbracket://payment-success';
+    }, 1200);
+  </script>
+</body>
+</html>

@@ -1,24 +1,56 @@
 import express from 'express';
-import Stripe from 'stripe';
+import bodyParser from 'body-parser';
 import cors from 'cors';
 
 const app = express();
-const stripe = new Stripe('pk_test_51Rh5koISjXpxVHMtTSZ6Vuenl5Lc5a3TuXReTolFVgS9ZaFSr2gixcGR6Vqmr2n6O0PPAN0lFvLW7b3Q2ojQXklN009xJ9kZBm'); // Replace with your Stripe secret key
-
+app.use(bodyParser.urlencoded({ extended: false }));
+app.use(bodyParser.json());
 app.use(cors());
-app.use(express.json());
 
-app.post('/api/create-payment-intent', async (req, res) => {
-  const { amount, currency } = req.body;
-  try {
-    const paymentIntent = await stripe.paymentIntents.create({
-      amount, // amount in cents
-      currency,
-    });
-    res.json({ clientSecret: paymentIntent.client_secret });
-  } catch (error) {
-    res.status(500).json({ error: error.message });
-  }
+// Replace with your sandbox credentials
+const PAYFAST_MERCHANT_ID = '10000100';
+const PAYFAST_MERCHANT_KEY = '46f0cd694581a';
+const PAYFAST_SANDBOX_URL = 'https://sandbox.payfast.co.za/eng/process';
+
+// PayFast payment URL generation endpoint
+app.post('/payfast-url', (req, res) => {
+  const { amount, item_name, return_url, cancel_url, notify_url } = req.body;
+  const params = {
+    merchant_id: PAYFAST_MERCHANT_ID,
+    merchant_key: PAYFAST_MERCHANT_KEY,
+    amount,
+    item_name,
+    return_url,
+    cancel_url,
+    notify_url,
+  };
+  const query = Object.entries(params)
+    .map(([key, val]) => `${key}=${encodeURIComponent(val)}`)
+    .join('&');
+  const paymentUrl = `${PAYFAST_SANDBOX_URL}?${query}`;
+  res.json({ url: paymentUrl });
 });
 
-app.listen(5000, () => console.log('Server running on port 5000'));
+// PayFast ITN webhook endpoint
+app.post('/payfast-webhook', (req, res) => {
+  console.log('PayFast ITN received:', req.body);
+  if (req.body.payment_status === 'COMPLETE') {
+    console.log('Payment completed for:', req.body.pf_payment_id);
+  }
+  res.status(200).send('OK');
+});
+
+// Mock PayFast initiate endpoint
+app.post('/api/payfast-initiate', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Mock PayFast payment initiated successfully.',
+    paymentUrl: 'https://sandbox.payfast.co.za/mock-payment',
+    transactionId: 'MOCK1234567890'
+  });
+});
+
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`PayFast server running on port ${PORT}`);
+});
